@@ -34,8 +34,10 @@
     pen.setTransform(ratio, 0, 0, ratio, 0, 0);
     const css = getComputedStyle(document.documentElement);
     const color = name => css.getPropertyValue('--' + name).trim();
-    const rgb = hex => hex.match(/[a-f\d]{2}/gi).map(v => parseInt(v, 16));
+    const rgb = hex => /^#[a-f\d]{6}$/i.test(hex) ? hex.slice(1).match(/../g).map(v => parseInt(v, 16)) : null;
     const low = rgb(color('plot-bg')), high = rgb(color('plot-ink'));
+    // Computed colors can be unavailable during document/style initialization.
+    if (!low || !high) return;
     const left = 58, top = 12, plotWidth = width - left - 10, plotHeight = height - top - 34;
     const rowHeight = plotHeight / 32, span = 12;
     const end = columns.length ? columns.at(-1).time : 0, start = Math.max(0, end - span);
@@ -308,6 +310,7 @@
   audio.onInterrupted(key => { errorKey = key; stop(); });
   document.addEventListener('visibilitychange', () => { if (document.hidden && busy) stop(); });
   window.addEventListener('pagehide', stop);
+  window.addEventListener('load', drawPlot);
   new ResizeObserver(drawPlot).observe(canvas);
   document.body.dataset.busy = 'false';
   render();

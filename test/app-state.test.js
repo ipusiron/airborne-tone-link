@@ -8,7 +8,7 @@ const core = require('../codec-core.js');
 const messages = require('../messages.js');
 const root = path.join(__dirname, '..');
 
-function app(run) {
+function app(run, plot = null) {
   const element = () => ({
     textContent: '', value: '', dataset: {}, hidden: false, files: [], listeners: {},
     addEventListener(type, handler) { this.listeners[type] = handler; }
@@ -22,7 +22,9 @@ function app(run) {
   nodes.role.value = 'loopback';
   nodes['text-input'].value = 'SECRET';
   nodes.gain.value = '-30';
-  nodes.spectrogram.getContext = () => null;
+  nodes.spectrogram.getContext = () => plot && plot.pen;
+  nodes.spectrogram.clientWidth = plot ? 320 : 0;
+  nodes.spectrogram.clientHeight = plot ? 220 : 0;
   const document = {
     documentElement: { dataset: {} }, body: { dataset: {} }, addEventListener() {},
     getElementById: id => nodes[id],
@@ -33,15 +35,16 @@ function app(run) {
     open: async () => ({ sampleRate: 48000, processing: {} }),
     run, close: async () => {}, onInterrupted() {}
   };
-  const window = { AirborneCodec: core, AirborneMessages: messages,
-    AirborneAudio: { create: () => audio }, addEventListener() {} };
+  const window = { AirborneCodec: core, AirborneMessages: messages, listeners: {},
+    AirborneAudio: { create: () => audio }, addEventListener(type, handler) { this.listeners[type] = handler; } };
   vm.runInNewContext(fs.readFileSync(path.join(root, 'app.js'), 'utf8'), {
     window, document, navigator: { language: 'en' }, location: { search: '?lang=en' },
     URLSearchParams, TextEncoder, devicePixelRatio: 1, matchMedia: () => ({ matches: false }),
+    getComputedStyle: () => ({ getPropertyValue: () => plot.color }),
     ResizeObserver: class { observe() {} }, localStorage: { getItem() { return null; }, setItem() {} }
   });
   return {
-    nodes, start: () => nodes.start.listeners.click(),
+    nodes, start: () => nodes.start.listeners.click(), loaded: () => window.listeners.load(),
     changeRole(value) { nodes.role.value = value; nodes.role.listeners.change(); },
     changeMode() { mode = modes[1]; mode.listeners.change(); }
   };
@@ -124,4 +127,16 @@ test('UI: outgoing waveform and WAV origins are distinguished from microphone in
   assert.equal(view.nodes['live-source'].textContent, messages.en.sourceSend);
   view.changeRole('offline');
   assert.equal(view.nodes['live-source'].textContent, messages.en.sourceWav);
+});
+
+test('UI: unavailable computed plot colors do not crash initialization and load redraws the graph', () => {
+  let fills = 0;
+  const plot = { color: '', pen: new Proxy({}, { get: (_target, key) =>
+    key === 'fillRect' ? () => { fills++; } : () => {} }) };
+  const view = app(async () => {}, plot);
+  assert.equal(fills, 0);
+  assert.equal(view.nodes['live-text'].textContent, messages.en.noRecoveredText);
+  plot.color = '#f6f5f0';
+  view.loaded();
+  assert.ok(fills > 0);
 });
