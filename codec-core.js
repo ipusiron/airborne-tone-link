@@ -288,7 +288,91 @@
     return { samples, timeline, rate, duration: samples.length / rate };
   }
 
+  // Radix-2 FFT with the periodic Blackman window used by AnalyserNode.
+  // Offline input is local PCM; no output node or microphone is required.
+  const blackman = Float64Array.from({ length: FFT_SIZE }, (_, i) =>
+    0.42 - 0.5 * Math.cos(2 * Math.PI * i / FFT_SIZE) + 0.08 * Math.cos(4 * Math.PI * i / FFT_SIZE));
+
+  function spectrumOf(samples, offset = 0) {
+    if (!Number.isInteger(offset) || offset < 0 || offset + FFT_SIZE > samples.length) throw new RangeError('invalidWindow');
+    const real = new Float64Array(FFT_SIZE), imaginary = new Float64Array(FFT_SIZE);
+    for (let i = 0, j = 0; i < FFT_SIZE; i++) {
+      const value = samples[offset + i];
+      real[j] = (Number.isFinite(value) ? value : 0) * blackman[i];
+      let bit = FFT_SIZE >> 1;
+      while (j & bit) { j ^= bit; bit >>= 1; }
+      j ^= bit;
+    }
+    for (let size = 2; size <= FFT_SIZE; size *= 2) {
+      const half = size / 2, angle = -2 * Math.PI / size;
+      for (let start = 0; start < FFT_SIZE; start += size) {
+        for (let j = 0; j < half; j++) {
+          const a = start + j, b = a + half, cosine = Math.cos(angle * j), sine = Math.sin(angle * j);
+          const r = real[b] * cosine - imaginary[b] * sine, im = real[b] * sine + imaginary[b] * cosine;
+          real[b] = real[a] - r; imaginary[b] = imaginary[a] - im;
+          real[a] += r; imaginary[a] += im;
+        }
+      }
+    }
+    return Float32Array.from({ length: FFT_SIZE / 2 }, (_, i) =>
+      10 * Math.log10(Math.max(1e-30, (real[i] ** 2 + imaginary[i] ** 2) / FFT_SIZE ** 2)));
+  }
+
+  const MAX_WAV_BYTES = 12 * 1024 * 1024;
+  function decodeWav(buffer) {
+    if (!(buffer instanceof ArrayBuffer) || buffer.byteLength < 44 || buffer.byteLength > MAX_WAV_BYTES) {
+      throw new RangeError('invalidWav');
+    }
+    const view = new DataView(buffer);
+    const tag = at => String.fromCharCode(...new Uint8Array(buffer, at, 4));
+    if (tag(0) !== 'RIFF' || tag(8) !== 'WAVE' || view.getUint32(4, true) + 8 !== buffer.byteLength) {
+      throw new RangeError('invalidWav');
+    }
+    let format = null, data = null;
+    for (let at = 12; at + 8 <= buffer.byteLength;) {
+      const name = tag(at), length = view.getUint32(at + 4, true), start = at + 8, end = start + length;
+      if (end > buffer.byteLength) throw new RangeError('invalidWav');
+      if (name === 'fmt ') {
+        if (length < 16 || format) throw new RangeError('invalidWav');
+        format = { code: view.getUint16(start, true), channels: view.getUint16(start + 2, true),
+          rate: view.getUint32(start + 4, true), byteRate: view.getUint32(start + 8, true),
+          align: view.getUint16(start + 12, true), bits: view.getUint16(start + 14, true) };
+      }
+      if (name === 'data') {
+        if (data) throw new RangeError('invalidWav');
+        data = { start, length };
+      }
+      at = end + length % 2;
+    }
+    if (!format || !data) throw new RangeError('invalidWav');
+    const { code, channels, rate, byteRate, align, bits } = format;
+    const valid = (code === 1 && [16, 24, 32].includes(bits)) || (code === 3 && bits === 32);
+    if (!valid || ![1, 2].includes(channels) || rate < 8000 || rate > 96000 ||
+        align !== channels * bits / 8 || byteRate !== rate * align || data.length % align) throw new RangeError('invalidWav');
+    const count = data.length / align;
+    if (count < FFT_SIZE || count > rate * 60) throw new RangeError('wavDuration');
+    const samples = new Float32Array(count);
+    for (let i = 0; i < count; i++) {
+      let sum = 0;
+      for (let channel = 0; channel < channels; channel++) {
+        const at = data.start + i * align + channel * bits / 8;
+        let value;
+        if (code === 3) value = view.getFloat32(at, true);
+        else if (bits === 16) value = view.getInt16(at, true) / 32768;
+        else if (bits === 24) {
+          const raw = view.getUint8(at) | (view.getUint8(at + 1) << 8) | (view.getUint8(at + 2) << 16);
+          value = ((raw << 8) >> 8) / 8388608;
+        } else value = view.getInt32(at, true) / 2147483648;
+        if (!Number.isFinite(value) || Math.abs(value) > 1) throw new RangeError('invalidWav');
+        sum += value;
+      }
+      samples[i] = sum / channels;
+    }
+    return { samples, rate, channels };
+  }
+
   return Object.freeze({ FFT_SIZE, MAX_BYTES, MAX_DB, RECEIVE_POWER_FLOOR, CONFIDENCE_DB, MODES, PREAMBLE, END,
     config, bytesOf, textOf, partialText, crc8, byteTones, frame, frequencyBin, bandPower, deltaDb,
-    classifyPowers, demodulate, createDecoder, matchRate, duration, processing, gain, toneSamples, transmission });
+    classifyPowers, demodulate, createDecoder, matchRate, duration, processing, gain, toneSamples, transmission,
+    MAX_WAV_BYTES, spectrumOf, decodeWav });
 }));

@@ -92,6 +92,9 @@
         <canvas id="spectrogram" width="960" height="320" role="img" data-label="plotLabel"></canvas>
       </div>
       <p class="muted" data-i18n="plotNote"></p>
+      <div class="plot-legend"><span>−100dB</span><span class="ramp" aria-hidden="true"></span><span>−20dB</span></div>
+      <p id="tone-pair" class="mono"></p>
+      <p class="muted" data-i18n="plotUnits"></p>
       <h3 data-i18n="live"></h3>
       <output id="live-text" class="live-text" aria-live="polite"></output>
     </section>
@@ -107,10 +110,88 @@
           <div id="agreement-row"><dt data-i18n="agreement"></dt><dd id="agreement-result"></dd></div>
         </dl>
       </div>
+      <h3 data-i18n="tradeoff"></h3>
+      <div class="table-wrap" role="region" tabindex="0" data-label="tradeoff">
+        <table id="tradeoff-table">
+          <thead><tr><th scope="col" data-i18n="metric"></th><th scope="col" data-i18n="reliable"></th><th scope="col" data-i18n="ultrasonic"></th></tr></thead>
+          <tbody>
+            <tr><th scope="row" data-i18n="dataBand"></th><td>1,500–4,414Hz</td><td>16,000–18,914Hz</td></tr>
+            <tr><th scope="row" data-i18n="symbolLength"></th><td>192ms</td><td>85ms</td></tr>
+            <tr><th scope="row" data-i18n="repeats"></th><td>2</td><td>1</td></tr>
+            <tr><th scope="row" data-i18n="nominalRate"></th><td>2.60B/s</td><td>11.76B/s</td></tr>
+            <tr><th scope="row" data-i18n="fullDuration"></th><td>9.966s</td><td>2.540s</td></tr>
+            <tr><th scope="row" data-i18n="netRate"></th><td>1.61B/s</td><td>6.30B/s</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="muted" data-i18n="rateNote"></p>
+      <p class="muted" data-i18n="confidenceNote"></p>
     </section>
     <section class="card" aria-labelledby="lesson-title">
       <h2 id="lesson-title"><span class="number">06</span> <span data-i18n="lessons"></span></h2>
-      <p data-i18n="retained"></p>
+      <details id="lesson-modulation">
+        <summary data-i18n="lesson1"></summary>
+        <p data-i18n="lesson1Text"></p>
+        <div class="table-wrap" role="region" tabindex="0" data-label="lesson1">
+          <table><thead><tr><th data-i18n="step"></th><th data-i18n="example"></th></tr></thead><tbody>
+            <tr><th data-i18n="character"></th><td>A = 0x41 = 0100 0001</td></tr>
+            <tr><th data-i18n="upperNibble"></th><td>4 → 1,876Hz</td></tr>
+            <tr><th data-i18n="lowerNibble"></th><td>1 → 3,098Hz</td></tr>
+            <tr><th data-i18n="frame"></th><td data-i18n="frameOrder"></td></tr>
+          </tbody></table>
+        </div>
+        <p data-i18n="crcNote"></p>
+        <a class="tool-link" href="https://github.com/ggerganov/ggwave" target="_blank" rel="noopener noreferrer" data-i18n="sourceGgwave"></a>
+      </details>
+      <details id="lesson-band">
+        <summary data-i18n="lesson2"></summary>
+        <p data-i18n="lesson2Text"></p>
+        <div class="table-wrap" role="region" tabindex="0" data-label="lesson2">
+          <table><thead><tr><th data-i18n="factor"></th><th data-i18n="effect"></th></tr></thead><tbody>
+            <tr><th data-i18n="hardware"></th><td data-i18n="hardwareEffect"></td></tr>
+            <tr><th data-i18n="processing"></th><td data-i18n="processingEffect"></td></tr>
+            <tr><th data-i18n="room"></th><td data-i18n="roomEffect"></td></tr>
+          </tbody></table>
+        </div>
+        <a class="tool-link" href="https://www.w3.org/TR/webaudio-1.0/" target="_blank" rel="noopener noreferrer">W3C Web Audio API</a>
+        <a class="tool-link" href="https://ipusiron.github.io/ultrasonic-reach-meter/" target="_blank" rel="noopener noreferrer">Day119 Ultrasonic Reach Meter</a>
+      </details>
+      <details id="lesson-channel">
+        <summary data-i18n="lesson3"></summary>
+        <p data-i18n="lesson3Text"></p>
+        <div class="table-wrap" role="region" tabindex="0" data-label="lesson3">
+          <table><thead><tr><th data-i18n="question"></th><th data-i18n="boundary"></th></tr></thead><tbody>
+            <tr><th data-i18n="transport"></th><td data-i18n="transportAnswer"></td></tr>
+            <tr><th data-i18n="secrecy"></th><td data-i18n="secrecyAnswer"></td></tr>
+            <tr><th data-i18n="observation"></th><td data-i18n="observationAnswer"></td></tr>
+          </tbody></table>
+        </div>
+        <a class="tool-link" href="https://github.com/ggerganov/ggwave" target="_blank" rel="noopener noreferrer" data-i18n="sourceGgwave"></a>
+        <a class="tool-link" href="https://ipusiron.github.io/mic-gain-logger/" target="_blank" rel="noopener noreferrer">Day041 Mic Gain Logger</a>
+      </details>
+      <details id="lesson-books">
+        <summary data-i18n="lesson4"></summary>
+        <p data-i18n="lesson4Text"></p>
+        <div class="table-wrap" role="region" tabindex="0" data-label="lesson4">
+          <table><thead><tr><th data-i18n="book"></th><th data-i18n="practice"></th></tr></thead><tbody>
+            <tr><th><a class="tool-link" href="https://akademeia.info/?page_id=53563" target="_blank" rel="noopener noreferrer" data-i18n="inputBook"></a></th><td data-i18n="inputPractice"></td></tr>
+            <tr><th><a class="tool-link" href="https://akademeia.info/?page_id=53554" target="_blank" rel="noopener noreferrer" data-i18n="outputBook"></a></th><td data-i18n="outputPractice"></td></tr>
+          </tbody></table>
+        </div>
+      </details>
+      <details id="lesson-uses">
+        <summary data-i18n="lesson5"></summary>
+        <p data-i18n="lesson5Text"></p>
+        <div class="table-wrap" role="region" tabindex="0" data-label="lesson5">
+          <table><thead><tr><th data-i18n="use"></th><th data-i18n="condition"></th></tr></thead><tbody>
+            <tr><th data-i18n="classroom"></th><td data-i18n="classroomCondition"></td></tr>
+            <tr><th data-i18n="pairing"></th><td data-i18n="pairingCondition"></td></tr>
+            <tr><th data-i18n="beacon"></th><td data-i18n="beaconCondition"></td></tr>
+          </tbody></table>
+        </div>
+        <a class="tool-link" href="https://www.ftc.gov/news-events/news/press-releases/2016/03/ftc-issues-warning-letters-app-developers-using-silverpush-code" target="_blank" rel="noopener noreferrer" data-i18n="sourceFtc"></a>
+        <p class="muted" data-i18n="retained"></p>
+      </details>
     </section>
   </main>
   <footer>

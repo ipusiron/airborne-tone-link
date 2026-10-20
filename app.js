@@ -12,6 +12,83 @@
   let environment = null, result = null, resultRole = null, expected = null, live = '', confirmResolve = null;
   const audio = window.AirborneAudio.create();
   const t = key => messages[language][key] || key;
+  const canvas = $('spectrogram'), pen = canvas.getContext('2d');
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+  let columns = [], plotSettings = core.config('reliable', 48000), plotStart = null;
+  let lastColumn = -Infinity, lastPaint = -Infinity, selectedTones = null;
+
+  function plotReset(mode) {
+    columns = [];
+    plotSettings = core.config(mode, 48000);
+    plotStart = null;
+    lastColumn = lastPaint = -Infinity;
+    selectedTones = null;
+    drawPlot();
+  }
+
+  function drawPlot() {
+    const width = canvas.clientWidth, height = canvas.clientHeight, ratio = Math.min(devicePixelRatio || 1, 2);
+    if (!width || !height || !pen) return;
+    canvas.width = Math.round(width * ratio);
+    canvas.height = Math.round(height * ratio);
+    pen.setTransform(ratio, 0, 0, ratio, 0, 0);
+    const css = getComputedStyle(document.documentElement);
+    const color = name => css.getPropertyValue('--' + name).trim();
+    const rgb = hex => hex.match(/[a-f\d]{2}/gi).map(v => parseInt(v, 16));
+    const low = rgb(color('plot-bg')), high = rgb(color('plot-ink'));
+    const left = 58, top = 12, plotWidth = width - left - 10, plotHeight = height - top - 34;
+    const rowHeight = plotHeight / 32, span = 12;
+    const end = columns.length ? columns.at(-1).time : 0, start = Math.max(0, end - span);
+    const x = time => left + (time - start) / span * plotWidth;
+    const y = index => top + (31 - index) * rowHeight;
+    pen.fillStyle = color('plot-bg');
+    pen.fillRect(0, 0, width, height);
+    const visible = columns.filter(column => column.time >= start);
+    for (const [index, column] of visible.entries()) {
+      const next = visible[index + 1], cellWidth = Math.max(1, x(next ? next.time : column.time + 0.032) - x(column.time));
+      for (let tone = 0; tone < 32; tone++) {
+        const level = Math.max(0, Math.min(1, (column.db[tone] + 100) / 80));
+        pen.fillStyle = `rgb(${low.map((v, i) => Math.round(v + (high[i] - v) * level)).join(',')})`;
+        pen.fillRect(x(column.time), y(tone), cellWidth, rowHeight);
+      }
+    }
+    pen.strokeStyle = color('line');
+    pen.lineWidth = 0.5;
+    for (let i = 0; i <= 32; i++) {
+      pen.beginPath(); pen.moveTo(left, top + i * rowHeight); pen.lineTo(width - 10, top + i * rowHeight); pen.stroke();
+    }
+    const lastData = visible.findLast(column => column.selected);
+    if (lastData) {
+      pen.strokeStyle = color('fg'); pen.lineWidth = 2;
+      for (const tone of lastData.selected) pen.strokeRect(x(lastData.time) - 2, y(tone), 5, rowHeight);
+    }
+    pen.font = '11px system-ui';
+    pen.fillStyle = color('muted');
+    pen.textAlign = 'right';
+    for (const i of [0, 8, 16, 24, 31]) pen.fillText((plotSettings.tones[i] / 1000).toFixed(2), left - 8, y(i) + rowHeight);
+    pen.fillText('kHz', left - 8, 10);
+    pen.textAlign = 'center';
+    for (let i = 0; i <= 3; i++) {
+      const time = start + i * 4;
+      pen.fillText(`${time.toFixed(0)}s`, Math.min(width - 16, x(time)), height - 8);
+    }
+    $('tone-pair').textContent = selectedTones ? `${t('selectedTones')}: ${selectedTones.join('Hz + ')}Hz` : t('noTone');
+  }
+
+  function plotSample(event) {
+    if (plotStart === null) plotStart = event.time;
+    plotSettings = event.settings;
+    if (event.time - lastColumn < 0.032) return;
+    lastColumn = event.time;
+    const value = event.decision.kind === 'data' ? event.decision.value : null;
+    const selected = value === null ? null : [value >> 4, 16 + (value & 15)];
+    if (selected) selectedTones = selected.map(i => plotSettings.tones[i]);
+    const db = event.decision.powers.map(power => 10 * Math.log10(Math.max(1e-12, power)));
+    columns.push({ time: event.time - plotStart, selected, db });
+    if (columns.length > 400) columns.shift();
+    const now = performance.now();
+    if (now - lastPaint >= (reduced.matches ? 250 : 50)) { lastPaint = now; drawPlot(); }
+  }
 
   function preview() {
     try {
@@ -66,6 +143,7 @@
     });
     preview();
     renderState();
+    drawPlot();
   }
 
   function setBusy(value) {
@@ -82,9 +160,11 @@
     confirmResolve = null;
     if ($('processing-dialog').open) $('processing-dialog').close();
     audio.close();
+    $('wav-input').value = '';
     setBusy(false);
     statusKey = 'stopped';
     renderState();
+    drawPlot();
   }
 
   function confirmProcessing() {
@@ -103,7 +183,10 @@
 
   function handleEvent(event) {
     if (event.type === 'status') statusKey = event.key;
-    if (event.type === 'sync') statusKey = 'synchronized';
+    if (event.type === 'sync') { statusKey = 'synchronized'; live = ''; }
+    if (event.type === 'byte') live = event.text;
+    if (event.type === 'spectrum') plotSample(event);
+    if (event.type === 'environment') environment = event.value;
     if (event.type === 'error') statusKey = event.reason;
     if (event.type === 'frame') {
       if (!result || event.valid || !result.valid) { result = event; live = event.text; }
@@ -120,7 +203,7 @@
       renderState();
       return;
     }
-    if (role === 'offline') { errorKey = 'offlinePending'; renderState(); return; }
+    if (role === 'offline' && !$('wav-input').files.length) { errorKey = 'chooseWav'; renderState(); return; }
     const token = ++generation;
     errorKey = inputError = '';
     result = null;
@@ -128,21 +211,26 @@
     resultRole = role;
     expected = role === 'loopback' ? $('text-input').value : null;
     statusKey = 'pending';
+    plotReset(mode);
     setBusy(true);
     renderState();
     try {
-      const details = await audio.open(role, key => { if (token === generation) { statusKey = key; renderState(); } });
-      if (token !== generation) return;
-      environment = details;
-      renderState();
-      if (!core.config(mode, details.sampleRate).supported) throw new Error('unsupportedBand');
-      if (details.processing.echoCancellation === 'on' || details.processing.noiseSuppression === 'on') {
-        if (!await confirmProcessing()) { if (token === generation) stop(); return; }
+      const onEvent = event => { if (token === generation) handleEvent(event); };
+      let received;
+      if (role === 'offline') {
+        received = await audio.offline($('wav-input').files[0], mode, onEvent);
+      } else {
+        const details = await audio.open(role, key => { if (token === generation) { statusKey = key; renderState(); } });
         if (token !== generation) return;
+        environment = details;
+        renderState();
+        if (!core.config(mode, details.sampleRate).supported) throw new Error('unsupportedBand');
+        if (details.processing.echoCancellation === 'on' || details.processing.noiseSuppression === 'on') {
+          if (!await confirmProcessing()) { if (token === generation) stop(); return; }
+          if (token !== generation) return;
+        }
+        received = await audio.run(role, $('text-input').value, mode, Number($('gain').value), onEvent);
       }
-      const received = await audio.run(role, $('text-input').value, mode, Number($('gain').value), event => {
-        if (token === generation) handleEvent(event);
-      });
       if (token !== generation) return;
       result = received;
       live = received.text;
@@ -152,7 +240,14 @@
       errorKey = messages[language][error.message] ? error.message : 'unexpected';
       statusKey = 'stopped';
     } finally {
-      if (token === generation) { await audio.close(); setBusy(false); renderState(); }
+      if (token === generation) {
+        await audio.close();
+        if (token !== generation) return;
+        $('wav-input').value = '';
+        setBusy(false);
+        renderState();
+        drawPlot();
+      }
     }
   }
 
@@ -165,6 +260,10 @@
   }
   $('text-input').addEventListener('input', () => { errorKey = ''; preview(); });
   $('role').addEventListener('change', roleChanged);
+  document.querySelectorAll('input[name="mode"]').forEach(node => node.addEventListener('change', () => {
+    if (!busy) plotReset(node.value);
+  }));
+  $('wav-input').addEventListener('change', () => { errorKey = ''; renderState(); });
   $('gain').addEventListener('input', () => { $('gain-value').textContent = `${$('gain').value}dBFS`; });
   $('lang-toggle').addEventListener('click', () => { language = language === 'ja' ? 'en' : 'ja'; save('lang', language); render(); });
   $('theme-toggle').addEventListener('click', () => { theme = theme === 'light' ? 'dark' : 'light'; save('theme', theme); render(); });
@@ -179,6 +278,7 @@
   audio.onInterrupted(key => { errorKey = key; stop(); });
   document.addEventListener('visibilitychange', () => { if (document.hidden && busy) stop(); });
   window.addEventListener('pagehide', stop);
+  new ResizeObserver(drawPlot).observe(canvas);
   document.body.dataset.busy = 'false';
   render();
   roleChanged();

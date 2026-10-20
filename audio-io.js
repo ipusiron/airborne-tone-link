@@ -232,7 +232,44 @@
       return result;
     }
 
-    return { available, open, info, run, read, stop, close, onInterrupted: handler => { interrupted = handler; } };
+    async function offline(file, mode, onEvent = () => {}) {
+      stop();
+      active = true;
+      const token = generation;
+      if (!file || file.size > core.MAX_WAV_BYTES) throw new Error('invalidWav');
+      let buffer = null, pcm = null;
+      try {
+        buffer = await file.arrayBuffer();
+        if (token !== generation) throw new Error('cancelled');
+        pcm = core.decodeWav(buffer);
+        buffer = null;
+        const cfg = core.config(mode, pcm.rate);
+        if (!cfg.supported) throw new Error('unsupportedBand');
+        onEvent({ type: 'environment', value: { sampleRate: pcm.rate, inputSampleRate: null, session: 'offlineSession',
+          processing: core.processing(), channelCount: pcm.channels } });
+        onEvent({ type: 'status', key: 'decoding' });
+        const decoder = core.createDecoder(cfg), hop = Math.round(pcm.rate * 0.008);
+        let result = null, frames = 0;
+        for (let offset = 0; offset + core.FFT_SIZE <= pcm.samples.length; offset += hop) {
+          if (token !== generation) throw new Error('cancelled');
+          const spectrum = core.spectrumOf(pcm.samples, offset);
+          const time = (offset + core.FFT_SIZE / 2) / pcm.rate, decision = core.demodulate(spectrum, cfg);
+          onEvent({ type: 'spectrum', spectrum, time, decision, settings: cfg });
+          for (const event of decoder.push(time, decision)) {
+            onEvent(event);
+            if (event.type === 'frame' && (!result || event.valid || !result.valid)) result = event;
+          }
+          if (++frames % 16 === 0) await wait(0.001, token);
+        }
+        if (!result) throw new Error('noFrame');
+        return result;
+      } finally {
+        // Discard raw file and decoded PCM; only display results survive.
+        buffer = pcm = null;
+      }
+    }
+
+    return { available, open, info, run, offline, read, stop, close, onInterrupted: handler => { interrupted = handler; } };
   }
   return Object.freeze({ create });
 }));
