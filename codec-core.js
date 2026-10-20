@@ -12,7 +12,7 @@
   const RECEIVE_POWER_FLOOR = 1e-12;
   const CONFIDENCE_DB = 6;
   // Physical frequencies are shared across devices, not derived from the receiver rate.
-  // Candidate timings are verified with offline browser rendering before release.
+  // Verified using native offline rendering at 44.1/48 kHz, including resampling.
   const MODES = Object.freeze({
     reliable: Object.freeze({ f0: 1500, spacing: 94, symbol: 0.192, repeats: 2 }),
     ultrasonic: Object.freeze({ f0: 16000, spacing: 94, symbol: 0.085, repeats: 1 })
@@ -249,7 +249,46 @@
       [key, settings[key] === true ? 'on' : settings[key] === false ? 'off' : 'unreported']));
   }
 
+  function gain(db) {
+    if (!Number.isFinite(db)) throw new RangeError('invalidGain');
+    return 10 ** (Math.max(-60, Math.min(MAX_DB, db)) / 20);
+  }
+
+  function toneSamples(frequencies, rate, seconds, db) {
+    rateValue(rate);
+    if (!Number.isInteger(rate) || !frequencies.length || frequencies.length > 2 ||
+        frequencies.some(f => !Number.isInteger(f) || f <= 0 || f > rate * 0.45) ||
+        !Number.isFinite(seconds) || seconds < 0.04 || seconds > 1) throw new RangeError('invalidTone');
+    const count = Math.round(seconds * rate), ramp = Math.round(0.006 * rate);
+    const samples = new Float32Array(count), amplitude = gain(db) / frequencies.length;
+    for (let i = 0; i < count; i++) {
+      const envelope = Math.min(1, i / ramp, (count - 1 - i) / ramp);
+      samples[i] = frequencies.reduce((sum, f) => sum + amplitude * Math.sin(2 * Math.PI * f * i / rate), 0) * envelope;
+    }
+    return samples;
+  }
+
+  function transmission(text, settings, db = -30) {
+    if (!settings.supported) throw new RangeError('unsupportedBand');
+    const symbols = frame(text), rate = settings.rate;
+    const count = Math.round(settings.symbol * rate);
+    const lead = Math.round(0.25 * rate), gap = Math.round(0.25 * rate);
+    const size = lead * 2 + symbols.length * count * settings.repeats + gap * (settings.repeats - 1);
+    const samples = new Float32Array(size), timeline = [];
+    let offset = lead;
+    for (let pass = 0; pass < settings.repeats; pass++) {
+      for (const [index, symbol] of symbols.entries()) {
+        const frequencies = symbol.kind === 'marker' ? [settings.markers[symbol.value]] : byteTones(symbol.value, settings);
+        samples.set(toneSamples(frequencies, rate, settings.symbol, db), offset);
+        timeline.push({ ...symbol, frequencies, start: offset / rate, end: (offset + count) / rate, pass, index });
+        offset += count;
+      }
+      if (pass + 1 < settings.repeats) offset += gap;
+    }
+    return { samples, timeline, rate, duration: samples.length / rate };
+  }
+
   return Object.freeze({ FFT_SIZE, MAX_BYTES, MAX_DB, RECEIVE_POWER_FLOOR, CONFIDENCE_DB, MODES, PREAMBLE, END,
     config, bytesOf, textOf, partialText, crc8, byteTones, frame, frequencyBin, bandPower, deltaDb,
-    classifyPowers, demodulate, createDecoder, matchRate, duration, processing });
+    classifyPowers, demodulate, createDecoder, matchRate, duration, processing, gain, toneSamples, transmission });
 }));

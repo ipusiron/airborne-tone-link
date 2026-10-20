@@ -31,7 +31,23 @@
     project: '生成AIで作るセキュリティツール200', repository: 'GitHubリポジトリ', author: '作者: IPUSIRON',
     unsupportedBand: 'この解析レートでは選んだ帯域を使えません。確実モードに切り替えてください。',
     noAudio: 'このブラウザーでは必要な音声機能を利用できません。',
-    unitsBytes: 'バイト', waiting: '開始待ち', retained: '音声や送受信内容は保存しません。'
+    unitsBytes: 'バイト', waiting: '開始待ち', retained: '音声や送受信内容は保存しません。',
+    permission: 'マイクの許可待ちです。', microphoneError: 'マイクを開けませんでした。許可と入力機器を確認してください。',
+    inputInterrupted: '入力が中断されました。入力を確認し、開始ボタンからやり直してください。',
+    audioInterrupted: '音声処理が中断されました。開始ボタンからやり直してください。',
+    selfCheck: '1kHzの短い音で、スピーカーからマイクへの経路を確認しています。',
+    selfCheckFailed: '自己点検の音を確認できませんでした。入力機器と音量を確認してください。',
+    receiving: '受信中です。最長60秒で停止します。', transmitting: '送信中です。',
+    synchronized: 'プリアンブルを受信しました。', completed: '終了しました。', stopped: '停止しました。',
+    noFrame: '有効なフレームを取得できませんでした。モード、入力機器、音量を確認してください。',
+    processingTitle: 'マイクの加工が有効です', processingWarning: 'エコー除去またはノイズ抑制がオンです。トーンが弱くなる場合があります。',
+    continue: 'この条件で続ける', cancel: '中止', crcPass: '一致', crcFail: '不一致（内容が変化）',
+    frameDamaged: 'フレームが不完全です。候補の文字列は未確認です。',
+    validFrame: 'CRCと終了マーカーを確認しました。CRCは誤りの検出であり、訂正や本人の証明ではありません。',
+    sentFrame: '送信波形の復号結果です。別の端末への到達は、受信側の結果で確認してください。',
+    uncertainFrame: '内容が変化した可能性があります。「?」は確信度が低いバイトです。',
+    invalidLength: '長さの情報を読めませんでした。次のプリアンブルを待っています。',
+    offlinePending: 'オフライン復号の準備中です。', unexpected: '処理を完了できませんでした。'
   };
   const en = {
     title: 'Airborne Tone Link', subtitle: 'Send a short text through sound and make the hidden channel visible.',
@@ -60,7 +76,23 @@
     project: '200 Security Tools with Generative AI', repository: 'GitHub repository', author: 'Author: IPUSIRON',
     unsupportedBand: 'The selected band is unavailable at this analysis rate. Switch to Reliable mode.',
     noAudio: 'The required audio features are unavailable in this browser.',
-    unitsBytes: 'bytes', waiting: 'Ready to start', retained: 'Audio and transmitted or received content are not saved.'
+    unitsBytes: 'bytes', waiting: 'Ready to start', retained: 'Audio and transmitted or received content are not saved.',
+    permission: 'Waiting for microphone permission.', microphoneError: 'Could not open the microphone. Check permissions and the input device.',
+    inputInterrupted: 'Input was interrupted. Check the input, then start again.',
+    audioInterrupted: 'Audio processing was interrupted. Start again.',
+    selfCheck: 'Checking the speaker-to-microphone path with a short 1kHz tone.',
+    selfCheckFailed: 'The self-check tone was not confirmed. Check the input device and volume.',
+    receiving: 'Receiving for up to 60 seconds.', transmitting: 'Transmitting.',
+    synchronized: 'Preamble received.', completed: 'Finished.', stopped: 'Stopped.',
+    noFrame: 'No complete frame was acquired. Check the mode, input device and volume.',
+    processingTitle: 'Microphone processing is enabled', processingWarning: 'Echo cancellation or noise suppression is on. It may weaken the tones.',
+    continue: 'Continue with these settings', cancel: 'Cancel', crcPass: 'Matches', crcFail: 'Mismatch (content changed)',
+    frameDamaged: 'The frame is incomplete. The candidate text is unverified.',
+    validFrame: 'CRC and end markers verified. CRC detects errors; it does not correct them or authenticate a sender.',
+    sentFrame: 'Decoded from the outgoing waveform. Check the receiver to confirm delivery to another device.',
+    uncertainFrame: 'The content may have changed. A question mark represents an uncertain byte.',
+    invalidLength: 'The length could not be decoded. Waiting for the next preamble.',
+    offlinePending: 'Offline decoding is being prepared.', unexpected: 'The operation could not be completed.'
   };
   return Object.freeze({ ja: Object.freeze(ja), en: Object.freeze(en) });
 }));

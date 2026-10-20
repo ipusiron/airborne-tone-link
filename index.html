@@ -9,6 +9,7 @@
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="style.css">
   <script src="codec-core.js" defer></script>
+  <script src="audio-io.js" defer></script>
   <script src="messages.js" defer></script>
   <script src="app.js" defer></script>
 </head>
@@ -79,10 +80,10 @@
         <p class="muted" data-i18n="fileHelp"></p>
       </div>
       <div class="actions">
-        <button id="start" class="primary" type="button" data-i18n="start" disabled></button>
+        <button id="start" class="primary" type="button" data-i18n="start"></button>
         <button id="stop" type="button" data-i18n="stop" disabled></button>
       </div>
-      <p id="status" role="status" aria-live="polite" data-i18n="waiting"></p>
+      <p id="status" role="status" aria-live="polite"></p>
       <p id="error" class="warning" role="alert"></p>
     </section>
     <section class="card" aria-labelledby="plot-title">
@@ -92,12 +93,13 @@
       </div>
       <p class="muted" data-i18n="plotNote"></p>
       <h3 data-i18n="live"></h3>
-      <output id="live-text" class="live-text" aria-live="polite" data-i18n="noData"></output>
+      <output id="live-text" class="live-text" aria-live="polite"></output>
     </section>
     <section class="card" aria-labelledby="result-title">
       <h2 id="result-title"><span class="number">05</span> <span data-i18n="result"></span></h2>
       <p id="result-empty" data-i18n="noData"></p>
       <div id="result-content" hidden>
+        <p id="result-note" class="muted"></p>
         <dl class="result-grid">
           <div><dt data-i18n="received"></dt><dd id="received-text"></dd></div>
           <div><dt data-i18n="crc"></dt><dd id="crc-result"></dd></div>
@@ -122,6 +124,14 @@
     <p data-i18n="helpOffline"></p>
     <p data-i18n="helpStop"></p>
     <button id="help-close" type="button" data-i18n="close"></button>
+  </dialog>
+  <dialog id="processing-dialog" aria-labelledby="processing-title">
+    <h2 id="processing-title" data-i18n="processingTitle"></h2>
+    <p data-i18n="processingWarning"></p>
+    <div class="actions">
+      <button id="processing-continue" type="button" data-i18n="continue"></button>
+      <button id="processing-cancel" type="button" data-i18n="cancel"></button>
+    </div>
   </dialog>
 </body>
 </html>
