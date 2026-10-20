@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-src 'none'; object-src 'none'; connect-src 'none'">
+  <meta name="referrer" content="no-referrer">
+  <title>Airborne Tone Link</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="style.css">
+  <script src="codec-core.js" defer></script>
+  <script src="messages.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header class="page-header">
+    <div class="title-row">
+      <h1>Airborne Tone Link</h1>
+      <div class="header-tools">
+        <button id="theme-toggle" class="icon-button" type="button" data-label="theme"><span aria-hidden="true">◐</span></button>
+        <button id="lang-toggle" class="icon-button" type="button" data-label="language"><span aria-hidden="true">文/A</span></button>
+        <button id="help-toggle" class="icon-button" type="button" data-label="help" aria-haspopup="dialog"><span aria-hidden="true">?</span></button>
+      </div>
+    </div>
+    <p data-i18n="subtitle"></p>
+    <p class="eyebrow">DAY120 · SOUND / DATA / VISIBILITY</p>
+  </header>
+  <noscript><p lang="ja">JavaScriptを有効にしてください。</p><p lang="en">Enable JavaScript to use this tool.</p></noscript>
+  <main>
+    <section class="card" aria-labelledby="before-title">
+      <h2 id="before-title"><span class="number">01</span> <span data-i18n="before"></span></h2>
+      <p data-i18n="safety"></p>
+      <p class="muted" data-i18n="ethics"></p>
+      <fieldset>
+        <legend data-i18n="mode"></legend>
+        <div class="choices">
+          <label class="choice"><input type="radio" name="mode" value="reliable" checked><span data-i18n="reliable"></span></label>
+          <label class="choice"><input type="radio" name="mode" value="ultrasonic"><span data-i18n="ultrasonic"></span></label>
+        </div>
+      </fieldset>
+      <p class="muted" data-i18n="modeNote"></p>
+    </section>
+    <section class="card" aria-labelledby="environment-title">
+      <h2 id="environment-title"><span class="number">02</span> <span data-i18n="environment"></span></h2>
+      <dl class="environment">
+        <div><dt data-i18n="sampleRate"></dt><dd id="env-sampleRate" data-i18n="unset"></dd></div>
+        <div><dt data-i18n="upper"></dt><dd id="env-upper" data-i18n="unset"></dd></div>
+        <div><dt data-i18n="inputSampleRate"></dt><dd id="env-inputSampleRate" data-i18n="unset"></dd></div>
+        <div><dt data-i18n="session"></dt><dd id="env-session" data-i18n="unset"></dd></div>
+        <div><dt data-i18n="echoCancellation"></dt><dd id="env-echoCancellation" data-i18n="unset"></dd></div>
+        <div><dt data-i18n="noiseSuppression"></dt><dd id="env-noiseSuppression" data-i18n="unset"></dd></div>
+        <div><dt data-i18n="autoGainControl"></dt><dd id="env-autoGainControl" data-i18n="unset"></dd></div>
+      </dl>
+      <p id="environment-warning" class="warning"></p>
+    </section>
+    <section class="card" aria-labelledby="role-title">
+      <h2 id="role-title"><span class="number">03</span> <span data-i18n="role"></span></h2>
+      <label for="role" data-i18n="role"></label>
+      <select id="role">
+        <option value="send" data-i18n="send"></option>
+        <option value="receive" data-i18n="receive"></option>
+        <option value="loopback" data-i18n="loopback"></option>
+        <option value="offline" data-i18n="offline"></option>
+      </select>
+      <p class="muted" data-i18n="roleNote"></p>
+      <div id="send-fields" class="field">
+        <label for="text-input" data-i18n="input"></label>
+        <textarea id="text-input" rows="2" autocomplete="off" spellcheck="false" autocapitalize="off">HELLO</textarea>
+        <p id="byte-count" class="mono"></p>
+        <p class="muted" data-i18n="inputHelp"></p>
+        <p><span data-i18n="preview"></span>: <output id="byte-preview" class="mono"></output></p>
+        <label for="gain"><span data-i18n="level"></span> <output id="gain-value">−30dBFS</output></label>
+        <input id="gain" type="range" min="-60" max="-12" value="-30" step="1">
+        <p class="muted" data-i18n="levelNote"></p>
+      </div>
+      <div id="file-fields" class="field" hidden>
+        <label for="wav-input" data-i18n="file"></label>
+        <input id="wav-input" type="file" accept=".wav,audio/wav">
+        <p class="muted" data-i18n="fileHelp"></p>
+      </div>
+      <div class="actions">
+        <button id="start" class="primary" type="button" data-i18n="start" disabled></button>
+        <button id="stop" type="button" data-i18n="stop" disabled></button>
+      </div>
+      <p id="status" role="status" aria-live="polite" data-i18n="waiting"></p>
+      <p id="error" class="warning" role="alert"></p>
+    </section>
+    <section class="card" aria-labelledby="plot-title">
+      <h2 id="plot-title"><span class="number">04</span> <span data-i18n="visualization"></span></h2>
+      <div class="plot-wrap">
+        <canvas id="spectrogram" width="960" height="320" role="img" data-label="plotLabel"></canvas>
+      </div>
+      <p class="muted" data-i18n="plotNote"></p>
+      <h3 data-i18n="live"></h3>
+      <output id="live-text" class="live-text" aria-live="polite" data-i18n="noData"></output>
+    </section>
+    <section class="card" aria-labelledby="result-title">
+      <h2 id="result-title"><span class="number">05</span> <span data-i18n="result"></span></h2>
+      <p id="result-empty" data-i18n="noData"></p>
+      <div id="result-content" hidden>
+        <dl class="result-grid">
+          <div><dt data-i18n="received"></dt><dd id="received-text"></dd></div>
+          <div><dt data-i18n="crc"></dt><dd id="crc-result"></dd></div>
+          <div><dt data-i18n="confidence"></dt><dd id="confidence-result"></dd></div>
+          <div id="agreement-row"><dt data-i18n="agreement"></dt><dd id="agreement-result"></dd></div>
+        </dl>
+      </div>
+    </section>
+    <section class="card" aria-labelledby="lesson-title">
+      <h2 id="lesson-title"><span class="number">06</span> <span data-i18n="lessons"></span></h2>
+      <p data-i18n="retained"></p>
+    </section>
+  </main>
+  <footer>
+    <a href="https://github.com/ipusiron/airborne-tone-link" target="_blank" rel="noopener noreferrer" data-i18n="repository"></a>
+    <a href="https://akademeia.info/?page_id=44607" target="_blank" rel="noopener noreferrer" data-i18n="project"></a>
+    <span data-i18n="author"></span>
+  </footer>
+  <dialog id="help-dialog" aria-labelledby="help-title">
+    <h2 id="help-title" data-i18n="help"></h2>
+    <p data-i18n="helpIntro"></p>
+    <p data-i18n="helpOffline"></p>
+    <p data-i18n="helpStop"></p>
+    <button id="help-close" type="button" data-i18n="close"></button>
+  </dialog>
+</body>
+</html>

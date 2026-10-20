@@ -1,0 +1,66 @@
+/* Airborne Tone Link - MIT (c) 2026 ipusiron */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else root.AirborneMessages = factory();
+}(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+  'use strict';
+  const ja = {
+    title: 'Airborne Tone Link', subtitle: '短い文字列を音で送り、見えない通信路を画面で確かめます。',
+    language: 'Switch to English', theme: '明暗を切り替え', help: '使い方', close: '閉じる',
+    before: '始める前に', safety: '音量を小さくして始めてください。周りの人やペットに配慮し、不快ならすぐ停止してください。',
+    ethics: '作者IPUSIRONはセキュリティ分野の技術書の著者です。悪用を勧めません。医療機器ではありません。',
+    mode: '通信モード', reliable: '確実（可聴）', ultrasonic: '本気（近超音波）',
+    modeNote: '2台では同じモードを選び、受信を先に開始します。「確実」は低速のモード名であり、成功を保証するものではありません。',
+    environment: 'この環境', sampleRate: '解析レート', inputSampleRate: 'マイクの報告レート',
+    upper: '出力の上限', session: '音声セッション', echoCancellation: 'エコー除去',
+    noiseSuppression: 'ノイズ抑制', autoGainControl: '自動ゲイン', unreported: '報告なし',
+    on: 'オン', off: 'オフ', unset: '開始後に表示', role: '役割', send: '送るだけ', receive: '受けるだけ',
+    loopback: '折り返し（1台）', offline: 'オフライン復号', roleNote: '折り返しは実際のスピーカーからマイクへ音を渡します。',
+    input: '送る文字列', inputHelp: 'UTF-8で最大16バイトです。日本語は多くの文字が3バイト、絵文字は4バイトになります。',
+    level: '出力レベル', levelNote: '上限−12dBFS。OSの音量は別に調整してください。',
+    start: '開始', stop: '停止', pending: '準備中', idle: '停止中', preview: '送信するバイト',
+    tooLong: '16バイト以内にしてください。', invalidUnicode: '正しいUnicode文字列を入力してください。',
+    emptyInput: '送る文字列を入力してください。', file: '復号するWAV', fileHelp: '端末内で読み取り、解析後に音声を解放します。',
+    visualization: 'スペクトログラムとライブ復号', plotLabel: '時間に沿った32本のトーンの強さ',
+    plotNote: '縦は周波数、横は時間です。濃さはパワー、枠は判定した2本のトーンを示します。',
+    live: '復号中の文字列', noData: 'まだデータはありません。', result: '結果', received: '受信文字列',
+    crc: 'CRC-8', confidence: '最も低い確信度', agreement: '文字の一致率', tradeoff: 'モードの比較',
+    lessons: '座学', helpIntro: '2台で同じモードを選びます。受信側を先に開始し、送信側で短い文字列を送ります。',
+    helpOffline: 'WAVのオフライン復号ではマイクを開きません。言語と明暗以外は保存せず、外部へ送信しません。',
+    helpStop: '停止ボタン、タブの非表示、ヘルプを開く操作で音と入力を停止します。',
+    project: '生成AIで作るセキュリティツール200', repository: 'GitHubリポジトリ', author: '作者: IPUSIRON',
+    unsupportedBand: 'この解析レートでは選んだ帯域を使えません。確実モードに切り替えてください。',
+    noAudio: 'このブラウザーでは必要な音声機能を利用できません。',
+    unitsBytes: 'バイト', waiting: '開始待ち', retained: '音声や送受信内容は保存しません。'
+  };
+  const en = {
+    title: 'Airborne Tone Link', subtitle: 'Send a short text through sound and make the hidden channel visible.',
+    language: '日本語に切り替え', theme: 'Toggle light and dark', help: 'Help', close: 'Close',
+    before: 'Before starting', safety: 'Start at a low volume. Consider people and pets nearby. Stop immediately if the sound is uncomfortable.',
+    ethics: 'IPUSIRON writes technical books on security and does not encourage misuse. This is not a medical device.',
+    mode: 'Communication mode', reliable: 'Reliable (audible)', ultrasonic: 'Ultrasonic (advanced)',
+    modeNote: 'Choose the same mode on both devices and start receiving first. Reliable is the slower mode name, not a guarantee of success.',
+    environment: 'This environment', sampleRate: 'Analysis rate', inputSampleRate: 'Reported microphone rate',
+    upper: 'Output ceiling', session: 'Audio session', echoCancellation: 'Echo cancellation',
+    noiseSuppression: 'Noise suppression', autoGainControl: 'Automatic gain', unreported: 'Unreported',
+    on: 'On', off: 'Off', unset: 'Shown after starting', role: 'Role', send: 'Send only', receive: 'Receive only',
+    loopback: 'Loopback (one device)', offline: 'Decode a WAV', roleNote: 'Loopback uses the physical speaker-to-microphone path.',
+    input: 'Text to send', inputHelp: 'Up to 16 UTF-8 bytes. Many Japanese characters use 3 bytes; an emoji often uses 4.',
+    level: 'Output level', levelNote: 'Capped at −12dBFS. Adjust the OS volume separately.',
+    start: 'Start', stop: 'Stop', pending: 'Preparing', idle: 'Stopped', preview: 'Bytes to transmit',
+    tooLong: 'Keep the text within 16 bytes.', invalidUnicode: 'Enter a valid Unicode string.',
+    emptyInput: 'Enter a text to send.', file: 'WAV to decode', fileHelp: 'Read locally; audio is released after analysis.',
+    visualization: 'Spectrogram and live decoding', plotLabel: 'Power of 32 tones over time',
+    plotNote: 'Frequency is vertical and time is horizontal. Shading shows power; outlines mark the two selected tones.',
+    live: 'Live decoded text', noData: 'No data yet.', result: 'Results', received: 'Received text',
+    crc: 'CRC-8', confidence: 'Lowest confidence', agreement: 'Character agreement', tradeoff: 'Mode comparison',
+    lessons: 'Learn', helpIntro: 'Select the same mode on two devices. Start the receiver, then send a short text from the other device.',
+    helpOffline: 'Decoding a WAV does not open the microphone. Only language and theme preferences are saved. Nothing is sent over the network.',
+    helpStop: 'Stop, hiding the tab, or opening Help ends the sound and microphone input.',
+    project: '200 Security Tools with Generative AI', repository: 'GitHub repository', author: 'Author: IPUSIRON',
+    unsupportedBand: 'The selected band is unavailable at this analysis rate. Switch to Reliable mode.',
+    noAudio: 'The required audio features are unavailable in this browser.',
+    unitsBytes: 'bytes', waiting: 'Ready to start', retained: 'Audio and transmitted or received content are not saved.'
+  };
+  return Object.freeze({ ja: Object.freeze(ja), en: Object.freeze(en) });
+}));
