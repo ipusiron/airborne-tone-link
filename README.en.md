@@ -78,6 +78,14 @@ Supported files are PCM 16/24/32-bit or float 32-bit WAV, 8–96kHz, one or two 
 The selected band must be supported at the file's sample rate. Compressed WAV and WAVE_FORMAT_EXTENSIBLE are not supported.
 Stereo channels are averaged, so opposite-phase audio can cancel out. Other modem protocols and speech are not decoded.
 
+### Recovered text and successful reception
+
+“Text recovered from sound” contains candidates read from the microphone in Receive or Loopback, the outgoing waveform in Send, or the selected WAV offline. The send text is never copied into this display. Partial text is unverified; CRC, end-marker and UTF-8 verification is reported separately.
+
+If no payload byte is readable, the display says “No characters recovered.” A `?` marks an unreadable position, not an acquired character (unless the original text contains a `?`). Readable and unreadable byte counts are shown separately. Stopping preserves partial candidates as unverified; changing the mode or role clears previous results.
+
+The graph spans 12 seconds. Ultrasonic transmissions finish quickly, leaving unmeasured time on the right. “No samples” does not mean measured silence or reception failure. A frame that could not be read to the end may still contain partial candidates.
+
 Offline decoding creates neither microphone input nor audio output. The file stays local; its selection and analysis data are released when decoding finishes or stops.
 The tool has no recording or audio-download feature.
 
@@ -243,6 +251,7 @@ airborne-tone-link/
 ├── test/                       # node:test
 │   ├── codec.test.js           # Encoding, synchronization, decisions, agreement
 │   ├── audio.test.js           # Graphs, interruptions and resource cleanup
+│   ├── app-state.test.js       # Recovered candidates, missing data, verification and reset
 │   ├── offline.test.js         # Independent DFT, WAV and actual PCM decoding
 │   ├── structure.test.js       # CSP, contrast, dictionaries and formatting
 │   └── readme.test.js          # Metadata, examples, rates, sources and images

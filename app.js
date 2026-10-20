@@ -9,7 +9,7 @@
   let language = [query, stored('lang'), navigator.language.startsWith('ja') ? 'ja' : 'en'].find(v => v === 'ja' || v === 'en');
   let theme = stored('theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
   let errorKey = '', inputError = '', statusKey = 'waiting', busy = false, generation = 0;
-  let environment = null, result = null, resultRole = null, expected = null, live = '', confirmResolve = null;
+  let environment = null, result = null, resultRole = null, expected = null, live = null, confirmResolve = null;
   const audio = window.AirborneAudio.create();
   const t = key => messages[language][key] || key;
   const canvas = $('spectrogram'), pen = canvas.getContext('2d');
@@ -56,6 +56,20 @@
     pen.lineWidth = 0.5;
     for (let i = 0; i <= 32; i++) {
       pen.beginPath(); pen.moveTo(left, top + i * rowHeight); pen.lineTo(width - 10, top + i * rowHeight); pen.stroke();
+    }
+    const measuredEnd = Math.min(width - 10, x(end + (columns.length ? 0.032 : 0)));
+    const unmeasuredWidth = width - 10 - measuredEnd;
+    if (unmeasuredWidth > 0) {
+      pen.fillStyle = color('surface');
+      pen.fillRect(measuredEnd, top, unmeasuredWidth, plotHeight);
+      pen.strokeStyle = color('muted');
+      pen.setLineDash([3, 3]);
+      pen.beginPath(); pen.moveTo(measuredEnd, top); pen.lineTo(measuredEnd, top + plotHeight); pen.stroke();
+      pen.setLineDash([]);
+      if (unmeasuredWidth > 80) {
+        pen.font = '12px system-ui'; pen.textAlign = 'center'; pen.fillStyle = color('muted');
+        pen.fillText(t('unmeasured'), measuredEnd + unmeasuredWidth / 2, top + plotHeight / 2);
+      }
     }
     const lastData = visible.findLast(column => column.selected);
     if (lastData) {
@@ -107,7 +121,15 @@
   function renderState() {
     $('status').textContent = t(statusKey);
     $('error').textContent = t(($('send-fields').hidden ? '' : inputError) || errorKey);
-    $('live-text').textContent = live || t('noData');
+    const role = resultRole || $('role').value;
+    $('live-source').textContent = t(role === 'send' ? 'sourceSend' : role === 'offline' ? 'sourceWav' : 'sourceMic');
+    const known = live ? live.bytes.filter(byte => byte !== null).length : 0;
+    $('live-text').textContent = known ? live.text || t('incompleteCharacter') : t('noRecoveredText');
+    const state = live && live.type === 'frame' ? (live.valid ? 'liveVerified' : 'liveInvalid') :
+      live ? (busy ? 'livePending' : 'liveUnverified') : 'liveEmpty';
+    $('live-state').textContent = t(state);
+    $('live-count').textContent = live ?
+      `${t('readBytes')}: ${known} / ${t('unknownBytes')}: ${live.bytes.length - known}` : '';
     if (environment) {
       for (const key of ['sampleRate', 'inputSampleRate']) {
         $('env-' + key).textContent = environment[key] ? `${environment[key]}Hz` : t('unreported');
@@ -121,7 +143,8 @@
     $('result-empty').hidden = Boolean(result);
     $('result-content').hidden = !result;
     if (result) {
-      $('received-text').textContent = result.text || (result.bytes.length ? '?' : '∅');
+      $('received-text').textContent = result.bytes.length && result.bytes.every(byte => byte === null) ?
+        t('noRecoveredText') : result.text || (result.bytes.length ? '?' : '∅');
       $('crc-result').textContent = t(result.crcOk ? 'crcPass' : 'crcFail');
       $('confidence-result').textContent = `${Math.max(0, Math.min(...result.confidences, 120)).toFixed(1)}dB`;
       const agreement = core.matchRate(expected, result.text, resultRole);
@@ -183,13 +206,13 @@
 
   function handleEvent(event) {
     if (event.type === 'status') statusKey = event.key;
-    if (event.type === 'sync') { statusKey = 'synchronized'; live = ''; }
-    if (event.type === 'byte') live = event.text;
+    if (event.type === 'sync') { statusKey = 'synchronized'; live = null; }
+    if (event.type === 'byte') live = event;
     if (event.type === 'spectrum') plotSample(event);
     if (event.type === 'environment') environment = event.value;
     if (event.type === 'error') statusKey = event.reason;
     if (event.type === 'frame') {
-      if (!result || event.valid || !result.valid) { result = event; live = event.text; }
+      if (!result || event.valid || !result.valid) { result = event; live = event; }
     }
     if (event.type !== 'spectrum') renderState();
   }
@@ -207,7 +230,7 @@
     const token = ++generation;
     errorKey = inputError = '';
     result = null;
-    live = '';
+    live = null;
     resultRole = role;
     expected = role === 'loopback' ? $('text-input').value : null;
     statusKey = 'pending';
@@ -233,7 +256,7 @@
       }
       if (token !== generation) return;
       result = received;
-      live = received.text;
+      live = received;
       statusKey = 'completed';
     } catch (error) {
       if (token !== generation || error.message === 'cancelled') return;
@@ -251,17 +274,24 @@
     }
   }
 
+  function clearResults() {
+    result = live = resultRole = expected = null;
+    statusKey = 'waiting';
+    errorKey = '';
+    plotReset(document.querySelector('input[name="mode"]:checked').value);
+    renderState();
+  }
+
   function roleChanged() {
     const role = $('role').value;
     $('send-fields').hidden = !['send', 'loopback'].includes(role);
     $('file-fields').hidden = role !== 'offline';
-    errorKey = '';
-    renderState();
+    clearResults();
   }
   $('text-input').addEventListener('input', () => { errorKey = ''; preview(); });
   $('role').addEventListener('change', roleChanged);
   document.querySelectorAll('input[name="mode"]').forEach(node => node.addEventListener('change', () => {
-    if (!busy) plotReset(node.value);
+    if (!busy) clearResults();
   }));
   $('wav-input').addEventListener('change', () => { errorKey = ''; renderState(); });
   $('gain').addEventListener('input', () => { $('gain-value').textContent = `${$('gain').value}dBFS`; });
