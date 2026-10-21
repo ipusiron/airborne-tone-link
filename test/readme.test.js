@@ -104,7 +104,7 @@ test('README: both book pages, related tools, scope and matching section structu
   }
   const icons = text => [...text.matchAll(/^## (\S+)/gm)].map(match => match[1]);
   assert.deepEqual(icons(documents[0]), icons(documents[1]));
-  assert.equal(icons(documents[0]).length, 16);
+  assert.equal(icons(documents[0]).length, 19);
 });
 test('README: exactly eight referenced screenshots are 1280x800 PNGs below 300KB with captions', () => {
   const assets = fs.readdirSync(path.join(root, 'assets')).filter(name => name.endsWith('.png')).sort();
