@@ -89,7 +89,7 @@ test('Offline: malformed, oversized, non-PCM and non-finite WAVs are rejected', 
   const floating = wav(new Float32Array(2048), 48000, 32, 1, 3);
   new DataView(floating).setFloat32(44, NaN, true);
   assert.throws(() => c.decodeWav(floating), /invalidWav/);
-  assert.throws(() => c.decodeWav(wav(new Float32Array(8000 * 60 + 1), 8000)), /wavDuration/);
+  assert.throws(() => c.decodeWav(wav(new Float32Array(8000 * 300 + 1), 8000)), /wavDuration/);
 });
 
 for (const rate of [44100, 48000]) {
@@ -122,6 +122,22 @@ test('Offline: cancellation during file reading rejects without creating audio o
   io.stop();
   resolve(wav(new Float32Array(2048)));
   await assert.rejects(task, /cancelled/);
+  await io.close();
+});
+
+test('Offline: a 256-byte PCM WAV longer than 60 seconds recovers both complete frames', async () => {
+  const text = '日'.repeat(80) + '😀'.repeat(4);
+  const cfg = c.config('ultrasonic', 44100, { timing: 'long', repeats: 2 });
+  const buffer = wav(c.transmission(text, cfg).samples, 44100), frames = [];
+  assert.ok((buffer.byteLength - 44) / 2 / 44100 > 102);
+  const io = audio.create({ setTimeout: callback => setImmediate(callback), clearTimeout: clearImmediate });
+  const result = await io.offline({ size: buffer.byteLength, arrayBuffer: async () => buffer }, 'ultrasonic', e => {
+    if (e.type === 'frame') frames.push(e);
+  }, { timing: 'long', repeats: 2 });
+  assert.ok(result.valid);
+  assert.equal(result.text, text);
+  assert.equal(frames.length, 2);
+  assert.ok(frames.every(e => e.valid && e.bytes.length === 256 && e.text === text));
   await io.close();
 });
 

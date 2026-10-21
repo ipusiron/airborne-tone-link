@@ -33,7 +33,7 @@ Microphone access requires browser permission. Public HTTPS or localhost is reco
 
 > ![Decoded result and mode comparison](assets/result-en.png)
 >
-> *A locally decoded WAV, with CRC, confidence and the time needed for 16 bytes.*
+> *A locally decoded WAV, with CRC, confidence and the time needed for 256 bytes.*
 
 > ![Learning table showing the byte-to-tone mapping](assets/lesson-en.png)
 >
@@ -60,11 +60,13 @@ Reported names do not identify microphones or speakers connected beyond an audio
 
 1. Open the tool on both devices and select the same band and tone duration. Begin with Audible.
 2. On the receiving device, select Receive only, start and allow microphone access.
-3. On the sending device, select Send only and enter up to 16 UTF-8 bytes.
+3. On the sending device, select Send only and enter up to 256 UTF-8 bytes.
 4. Lower the OS volume, then start. Check the receiver's text and CRC.
 5. To try near-ultrasound, switch both devices to Ultrasonic.
 
 `HELLO` is 5 bytes, `日本語` is 9 bytes and `😀😀😀😀` is 16 bytes.
+The small question-mark button beside Output level explains the effect of changing the value and its relationship to OS volume. The input area shows the estimated full transmission time. At 256 bytes, defaults take about 103 seconds; Extra long with two transmissions takes about 205 seconds. Keep both pages in the foreground while transmitting and receiving.
+
 Defaults are Audible, Long (192ms), and two full transmissions. Changing bands preserves duration and count. Some people can hear frequencies near 16kHz.
 Avoid simultaneous transmitters. There is no automatic reply or retransmission request; switch roles to reverse the direction.
 
@@ -78,7 +80,7 @@ If echo cancellation or noise suppression is on, the tool asks whether to contin
 ### Decode a WAV
 
 Select Decode a WAV and load audio using this tool's frame format.
-Supported files are PCM 16/24/32-bit or float 32-bit WAV, 8–96kHz, one or two channels, at most 12MiB and 60 seconds.
+Supported files are PCM 16/24/32-bit or float 32-bit WAV, 8–96kHz, one or two channels, at most 128MiB and 300 seconds (5 minutes).
 The selected band must be supported at the file's sample rate. Compressed WAV and WAVE_FORMAT_EXTENSIBLE are not supported.
 Stereo channels are averaged, so opposite-phase audio can cancel out. Other modem protocols and speech are not decoded.
 
@@ -112,7 +114,7 @@ Send only measures the upper plot; Receive only measures the lower plot. Check t
 | Does character count equal communication size? | `HELLO` has 5 characters and 5 bytes; `日本語` has 3 characters and 9 bytes. Compare their transmission times |
 | What happens when a character repeats? | `AAAA` repeats 1,876Hz and 3,098Hz. A synchronized clock still reads four separate bytes |
 | Which missing tone prevents decoding? | Change device direction or distance and inspect both blocks. One block alone leaves four bits unknown, producing “?” |
-| What does a speed figure count? | With defaults, either band takes 9.966 seconds for 16 bytes, or 1.61B/s net. Compare with 2.60B/s excluding framing |
+| What does a speed figure count? | With defaults, either band takes 102.894 seconds for 256 bytes, or 2.49B/s net. Compare with 2.60B/s excluding framing |
 | Is communication the same as secrecy? | Decode a public message with another receiver. CRC success does not imply encryption or sender authentication |
 
 In a class or exhibit, explain the mechanism in audible mode before moving to near-ultrasound.
@@ -122,15 +124,17 @@ A WAV with the same frame format lets you inspect decoding independently of the 
 
 | Item | Value |
 |---|---|
-| Encoding and limit | UTF-8, 16 bytes |
+| Encoding and limit | UTF-8, 256 bytes |
 | Tones | High nibble in block A, low nibble in block B; 32 candidates total |
 | Tone spacing | 94Hz, approximately four bins at 48kHz with FFT 2048 |
 | Data-band span | 2,914Hz across 31 intervals; markers at F0−188Hz and F0−94Hz |
-| Frame | 4 alternating markers, 1 length byte, 0–16 payload bytes, 1 CRC byte, 2 end markers |
+| Frame | 4 alternating markers, 1 or 3 length bytes, 0–256 payload bytes, 1 CRC byte, 2 end markers |
 | CRC | CRC-8/SMBUS: polynomial 0x07, initial value 0, no reflection, final XOR 0; covers length and payload |
 | FFT | 2048 samples, Blackman window, no smoothing; maximum power within ±1 bin of each candidate |
 | Confidence | Ratio between the largest and second-largest candidate powers; both blocks must reach 6dB; display the lower value |
 | Output | Calculated sine-wave AudioBuffer, 6ms edge ramps, default −30dBFS, maximum −12dBFS |
+
+Lengths up to 254 use one byte. For 255 or 256 bytes, `FF` introduces a two-byte big-endian length: `FF 00 FF` or `FF 01 00`. CRC covers the entire wire length header and payload. Keep messages within 16 bytes when communicating with an older version; update both sender and receiver for longer messages.
 
 For `HELLO`, payload bytes are `48 45 4C 4C 4F`, length is `05` and CRC is `B8`.
 `A` (`41`) maps to 1,876Hz and 3,098Hz in audible mode.
@@ -167,20 +171,20 @@ Comparison with default Long (192ms) tones and two full transmissions. Frequency
 | Symbol duration | 192ms | 192ms |
 | Full transmissions | 2 | 2 |
 | With repeats, without framing | 2.60B/s | 2.60B/s |
-| Time for 16 bytes | 9.966s | 9.966s |
-| Net rate for 16 bytes | 1.61B/s | 1.61B/s |
+| Time for 256 bytes | 102.894s | 102.894s |
+| Net rate for 256 bytes | 2.49B/s | 2.49B/s |
 
-| Common settings | With repeats, without framing | Time for 16 bytes | Net rate for 16 bytes |
+| Common settings | With repeats, without framing | Time for 256 bytes | Net rate for 256 bytes |
 |---|---:|---:|---:|
-| Short 85ms, once | 11.76B/s | 2.540s | 6.30B/s |
-| Short 85ms, twice | 5.88B/s | 4.830s | 3.31B/s |
-| Long 192ms, once | 5.21B/s | 5.108s | 3.13B/s |
-| Long 192ms, twice (default) | 2.60B/s | 9.966s | 1.61B/s |
-| Extra long 384ms, once | 2.60B/s | 9.716s | 1.65B/s |
-| Extra long 384ms, twice | 1.30B/s | 19.182s | 0.83B/s |
+| Short 85ms, once | 11.76B/s | 23.110s | 11.08B/s |
+| Short 85ms, twice | 5.88B/s | 45.970s | 5.57B/s |
+| Long 192ms, once | 5.21B/s | 51.572s | 4.96B/s |
+| Long 192ms, twice (default) | 2.60B/s | 102.894s | 2.49B/s |
+| Extra long 384ms, once | 2.60B/s | 102.644s | 2.49B/s |
+| Extra long 384ms, twice | 1.30B/s | 205.038s | 1.25B/s |
 
 B means bytes. The rate including repeats but excluding framing is `1 / (symbol duration × transmission count)`.
-For payload length L, symbol duration T and transmission count R, waveform duration is `0.5 + (L + 8) × T × R + 0.25 × (R − 1)` seconds.
+For payload length L, overhead H, symbol duration T and transmission count R, waveform duration is `0.5 + (L + H) × T × R + 0.25 × (R − 1)` seconds. H is 8 for L up to 254, and 10 for 255 or 256.
 This includes 250ms leading/trailing silence and a 250ms repeat gap. Permission time, self-check and device/OS latency are excluded.
 Treating “about 2.5B/s” or “about 12B/s” as complete-frame throughput overstates the result.
 
@@ -201,7 +205,7 @@ Maximum rate and maximum distance need not occur together. Countermeasures summa
 
 | Path and method | Rate and receiver | Distance and conditions | Example countermeasures | Source |
 |---|---|---|---|---|
-| Acoustic: this tool | 1.61B/s by default (0.83–6.30B/s across settings), 16 bytes; microphone | Physical range unmeasured | Disable unnecessary audio input/output; control receiving devices | Implementation and calculations above |
+| Acoustic: this tool | 2.49B/s by default (1.25–11.08B/s across settings), 256 bytes; microphone | Physical range unmeasured | Disable unnecessary audio input/output; control receiving devices | Implementation and calculations above |
 | Optical: LED-it-GO | Up to 4000bit/s with a photodiode; 15–120bit/s with cameras | Optical sensor: 3–5m indoors; signals observed at 20m outdoors at night; camera example at 8m | Cover LEDs; restrict cameras | [Author paper](https://arxiv.org/pdf/1702.06715), Table 7 and distance section |
 | Magnetic: MAGNETO | 0.2–5bit/s; smartphone magnetometer | 0–12cm, desktop PCs | Control nearby devices; increase separation | [Author paper](https://arxiv.org/pdf/1802.02317), Table 1 |
 | Magnetic: ODINI | 40bit/s; dedicated magnetic sensor | 100–150cm | Restrict receivers; address magnetic emissions | [Via MAGNETO Table 1](https://arxiv.org/pdf/1802.02317); original paper not directly verified |
@@ -227,7 +231,7 @@ See the linked book pages for the current contents. No book text is quoted or re
 ## 🔒 Privacy and safety
 
 - No recording, persisted messages or network transmission. Only language and theme preferences use localStorage
-- Send only never opens a microphone. Reception lasts at most 60 seconds. Finite transmission buffers stop automatically
+- Send only never opens a microphone. Reception lasts at most 300 seconds (5 minutes). Finite transmission buffers stop automatically
 - Stop, hiding/leaving the page, Help, microphone mute/end and audio-context interruptions end the session
 - Unmuting does not resume automatically; start again explicitly
 - No external scripts, fonts or CDN; user text is displayed with textContent
