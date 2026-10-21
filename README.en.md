@@ -54,6 +54,10 @@ The four Japanese views appear in the [Japanese README](README.md).
 
 ### Send between two devices
 
+First, use Check device names near the top to identify the opened microphone input and the default output reported by the browser. Test microphone shows input levels for five seconds without playing sound. Test speaker plays one 1kHz, 0.4-second tone at −30dBFS without opening the microphone. Stop, Help, hiding the tab and leaving the page end the tests.
+
+Reported names do not identify microphones or speakers connected beyond an audio interface. Withheld names remain unconfirmed. Levels are not sound pressure, and the page cannot determine whether you actually heard a test tone. Device names and audio are neither saved nor sent over the network.
+
 1. Open the tool on both devices and select the same band and tone duration. Begin with Audible.
 2. On the receiving device, select Receive only, start and allow microphone access.
 3. On the sending device, select Send only and enter up to 16 UTF-8 bytes.
@@ -90,6 +94,8 @@ Offline decoding creates neither microphone input nor audio output. The file sta
 The tool has no recording or audio-download feature.
 
 ### Compare transmitted and received sound
+
+If text recovery fails, check Reception diagnostics. It shows data tone detection, marker types, start sequences, length bytes, readable payload, frame verification and the largest analysis interval for that run. Stages not reached are not treated as successful, and readable bytes are not combined across repeats. The failed stage remains visible after stopping. Visible tones alone do not establish successful text communication.
 
 The default Loopback role shows the outgoing waveform above and microphone input below. Separate analyzers measure the two paths on the same time, frequency and color scales. The output is never wired directly into the receiver. The upper plot measures the digital waveform passed to the speaker, not sound emitted into the air. Their difference is not a calibrated attenuation measurement.
 

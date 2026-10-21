@@ -9,7 +9,7 @@ function setup(options = {}) {
   const timers = new Set(), contexts = [], requested = [], sources = [];
   let stoppedTracks = 0, reads = 0;
   const track = new EventTarget();
-  Object.assign(track, { muted: Boolean(options.muted), readyState: 'live', enabled: true,
+  Object.assign(track, { label: options.label || '', muted: Boolean(options.muted), readyState: 'live', enabled: true,
     getSettings: () => ({ sampleRate: 44100, channelCount: 1, echoCancellation: false,
       noiseSuppression: false, autoGainControl: false, ...options.settings }),
     stop() { this.readyState = 'ended'; stoppedTracks++; } });
@@ -30,7 +30,8 @@ function setup(options = {}) {
     createAnalyser() {
       const node = { kind: 'analyser', frequencyBinCount: 1024, targets: [],
         connect(target) { this.targets.push(target); }, disconnect() { this.disconnected = true; },
-        getFloatFrequencyData(values) { reads++; values.fill(-120); if (options.spectrum) options.spectrum(values, now, this); } };
+        getFloatFrequencyData(values) { reads++; values.fill(-120); if (options.spectrum) options.spectrum(values, now, this); },
+        getFloatTimeDomainData(values) { values.fill(options.sample || 0); } };
       this.analysers.push(node);
       if (!this.analyser) this.analyser = node;
       return node;
@@ -71,6 +72,7 @@ function setup(options = {}) {
     navigator: {
       audioSession: { type: 'auto' },
       mediaDevices: {
+        enumerateDevices: async () => { if (options.enumerationDenied) throw Error('Denied'); return options.devices || []; },
         getSupportedConstraints: () => ({ echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: true }),
         getUserMedia(request) {
           requested.push(request);
@@ -90,6 +92,64 @@ test('Audio: no context, output or microphone is created before an action', () =
   assert.equal(f.contexts.length, 0);
   assert.equal(f.requested.length, 0);
   assert.equal(f.sources.length, 0);
+});
+
+test('Devices: report the opened input and the default output, never the first arbitrary output', async () => {
+  const f = setup({ label: 'USB input', devices: [
+    { kind: 'audiooutput', deviceId: 'other', label: 'Other speaker' },
+    { kind: 'audiooutput', deviceId: 'default', label: 'Default - DAC' }
+  ] });
+  await f.audio.open('receive');
+  assert.deepEqual(await f.audio.devices(), { microphone: 'USB input', microphoneActive: true, speaker: 'Default - DAC' });
+  await f.audio.close();
+  assert.equal(f.metrics().stoppedTracks, 1);
+});
+
+test('Devices: withheld labels and missing default output stay unknown', async () => {
+  const f = setup({ devices: [{ kind: 'audiooutput', deviceId: 'other', label: 'Other speaker' }] });
+  await f.audio.open('receive');
+  assert.deepEqual(await f.audio.devices(), { microphone: null, microphoneActive: true, speaker: null });
+  await f.audio.close();
+  const denied = setup({ label: 'USB input', enumerationDenied: true });
+  await denied.audio.open('send');
+  assert.deepEqual(await denied.audio.devices(), { microphone: null, microphoneActive: false, speaker: null });
+  await denied.audio.close();
+});
+
+test('Devices: microphone test is bounded, reads actual samples and emits no sound', async () => {
+  const f = setup({ sample: 0.25 }), levels = [];
+  await f.audio.open('receive');
+  const maximum = await f.audio.testMicrophone(level => levels.push(level));
+  assert.ok(Math.abs(maximum - 20 * Math.log10(0.25)) < 1e-9);
+  assert.equal(levels.length, 100);
+  assert.equal(f.metrics().now, 5000);
+  assert.equal(f.sources.length, 0);
+  await f.audio.close();
+  assert.equal(f.contexts[0].state, 'closed');
+  assert.equal(f.metrics().stoppedTracks, 1);
+});
+
+test('Devices: microphone test can stop early and never continues after input interruption', async () => {
+  const f = setup({ tick: (now, track) => { if (now >= 100) track.muted = true; } });
+  await f.audio.open('receive');
+  await assert.rejects(f.audio.testMicrophone(), /inputInterrupted/);
+  assert.equal(f.metrics().now, 100);
+  await f.audio.close();
+  assert.equal(f.metrics().timers, 0);
+});
+
+test('Devices: speaker test is finite, quiet and does not request microphone access', async () => {
+  const f = setup();
+  await f.audio.open('send');
+  await f.audio.testSpeaker();
+  assert.equal(f.requested.length, 0);
+  assert.equal(f.sources.length, 1);
+  const source = f.sources[0];
+  assert.equal(source.buffer.count, 19200);
+  assert.ok(Math.max(...source.buffer.samples) <= 10 ** (-30 / 20) + 1e-8);
+  assert.equal(source.stops[0], source.startTime + 0.4);
+  await f.audio.close();
+  assert.equal(f.contexts[0].state, 'closed');
 });
 for (const role of ['send', 'receive', 'loopback']) {
   test(`Audio: ${role} selects the correct session, input constraints and graph`, async () => {

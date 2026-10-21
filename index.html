@@ -32,6 +32,24 @@
       <h2 id="before-title"><span class="number">01</span> <span data-i18n="before"></span></h2>
       <p data-i18n="safety"></p>
       <p class="muted" data-i18n="ethics"></p>
+      <h3 data-i18n="deviceTitle"></h3>
+      <dl class="environment">
+        <div><dt data-i18n="microphoneDevice"></dt><dd id="device-microphone"></dd></div>
+        <div><dt data-i18n="speakerDevice"></dt><dd id="device-speaker"></dd></div>
+      </dl>
+      <div class="actions">
+        <button id="check-devices" type="button" data-i18n="checkDevices"></button>
+        <button id="test-microphone" type="button" data-i18n="testMicrophone"></button>
+        <button id="test-speaker" type="button" data-i18n="testSpeaker"></button>
+        <button id="device-stop" type="button" data-i18n="stop" disabled></button>
+      </div>
+      <p id="device-status" role="status"></p>
+      <div id="microphone-level" hidden>
+        <label for="microphone-meter" data-i18n="microphoneLevel"></label>
+        <meter id="microphone-meter" min="-100" max="0" value="-100"></meter>
+        <output id="microphone-level-value" class="mono"></output>
+      </div>
+      <p class="muted" data-i18n="deviceNote"></p>
       <fieldset>
         <legend data-i18n="mode"></legend>
         <div class="choices">
@@ -124,6 +142,12 @@
       <p class="muted" data-i18n="plotUnits"></p>
       <h3 data-i18n="live"></h3>
       <p id="live-source" class="muted"></p>
+      <details id="receive-diagnostics" open>
+        <summary data-i18n="receiveDiagnostics"></summary>
+        <p id="diagnostic-summary" role="status"></p>
+        <pre id="diagnostic-details" class="diagnostic-details"></pre>
+        <p class="muted" data-i18n="diagnosticNote"></p>
+      </details>
       <output id="live-text" class="live-text" aria-live="polite"></output>
       <p id="live-state" role="status"></p>
       <p id="live-count" class="mono"></p>

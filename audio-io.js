@@ -180,6 +180,46 @@
       return { spectrum, time: context.currentTime - core.FFT_SIZE / (2 * context.sampleRate) };
     }
 
+    async function devices() {
+      const token = generation;
+      const microphone = track && track.label || null;
+      let list = [];
+      try { if (nav.mediaDevices && nav.mediaDevices.enumerateDevices) list = await nav.mediaDevices.enumerateDevices(); }
+      catch (_) { /* Labels may be withheld even when audio is available. */ }
+      if (token !== generation) throw new Error('cancelled');
+      // This tool uses the system-default output, never an arbitrary first device.
+      const output = list.find(device => device.kind === 'audiooutput' && device.deviceId === 'default');
+      return { microphone, microphoneActive: Boolean(track), speaker: output && output.label || null };
+    }
+
+    async function testMicrophone(onLevel = () => {}) {
+      if (!active || !context || !track || !analyser) throw new Error('cancelled');
+      const token = generation, deadline = host.performance.now() + 5000;
+      const samples = new Float32Array(core.FFT_SIZE);
+      let maximum = -100;
+      while (host.performance.now() < deadline) {
+        await wait(0.05, token);
+        checkInput();
+        if (!context || context.state !== 'running') throw new Error('audioInterrupted');
+        analyser.getFloatTimeDomainData(samples);
+        let peak = 0;
+        for (const value of samples) if (Number.isFinite(value)) peak = Math.max(peak, Math.abs(value));
+        const db = Math.max(-100, Math.min(0, 20 * Math.log10(Math.max(peak, 1e-5))));
+        maximum = Math.max(maximum, db);
+        onLevel({ db, maximum });
+      }
+      samples.fill(0);
+      return maximum;
+    }
+
+    async function testSpeaker() {
+      if (!active || !context || !outputAnalyser) throw new Error('cancelled');
+      const token = generation;
+      emit(core.toneSamples([1000], context.sampleRate, 0.4, -30), outputAnalyser);
+      await wait(0.55, token);
+      stopTone();
+    }
+
     async function selfCheck(db, onState) {
       const token = generation;
       onState('selfCheck');
@@ -213,7 +253,7 @@
         deadline = host.performance.now() + Math.min(60000, (wave.duration + info().outputLatency + 0.6) * 1000);
       }
       onEvent({ type: 'status', key: role === 'receive' ? 'receiving' : 'transmitting' });
-      let previous = -Infinity, lastAdvance = host.performance.now(), result = null;
+      let previous = -Infinity, lastReport = -Infinity, lastAdvance = host.performance.now(), result = null;
       while (host.performance.now() < deadline) {
         await wait(0.008, token);
         if (host.performance.now() >= deadline) break;
@@ -233,13 +273,19 @@
             decision: core.demodulate(spectrum, cfg), settings: cfg });
         }
         onEvent({ type: 'spectrum', side: role === 'send' ? 'transmit' : 'receive', ...current, decision, settings: cfg });
-        for (const event of decoder.push(current.time, decision)) {
+        const events = decoder.push(current.time, decision);
+        for (const event of events) {
           onEvent(event);
           if (event.type === 'frame' && (!result || event.valid || !result.valid)) result = event;
+        }
+        if (events.length || current.time - lastReport >= 0.25) {
+          onEvent({ type: 'diagnostics', value: decoder.diagnostics() });
+          lastReport = current.time;
         }
         if (role === 'receive' && result && result.valid) break;
         if (emitted && context.currentTime >= emitted.end + info().outputLatency + 0.2) break;
       }
+      onEvent({ type: 'diagnostics', value: decoder.diagnostics() });
       stopTone();
       if (!result) throw new Error('noFrame');
       return result;
@@ -272,8 +318,12 @@
             onEvent(event);
             if (event.type === 'frame' && (!result || event.valid || !result.valid)) result = event;
           }
-          if (++frames % 16 === 0) await wait(0.001, token);
+          if (++frames % 16 === 0) {
+            onEvent({ type: 'diagnostics', value: decoder.diagnostics() });
+            await wait(0.001, token);
+          }
         }
+        onEvent({ type: 'diagnostics', value: decoder.diagnostics() });
         if (!result) throw new Error('noFrame');
         return result;
       } finally {
@@ -282,7 +332,8 @@
       }
     }
 
-    return { available, open, info, run, offline, read, stop, close, onInterrupted: handler => { interrupted = handler; } };
+    return { available, open, info, devices, testMicrophone, testSpeaker, run, offline, read, stop, close,
+      onInterrupted: handler => { interrupted = handler; } };
   }
   return Object.freeze({ create });
 }));

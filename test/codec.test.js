@@ -11,7 +11,7 @@ function spectrum(symbol, cfg, shift = 0) {
   return bins;
 }
 
-function decodeSymbols(symbols, cfg, offset = 0.27) {
+function decodeSymbols(symbols, cfg, offset = 0.27, report = false) {
   const decoder = c.createDecoder(cfg), events = [];
   const step = 0.008;
   for (let i = 0; i * step < offset + (symbols.length + 2) * cfg.symbol; i++) {
@@ -20,8 +20,62 @@ function decodeSymbols(symbols, cfg, offset = 0.27) {
     const symbol = symbols[index];
     events.push(...decoder.push(time, c.demodulate(spectrum(symbol, cfg), cfg)));
   }
-  return events;
+  return report ? { events, diagnostics: decoder.diagnostics() } : events;
 }
+
+test('Diagnostics: visible data without a preamble does not imply payload recovery', () => {
+  const cfg = c.config('reliable', 48000, { timing: 'long' });
+  const { diagnostics: d } = decodeSymbols(c.frame('HELLO').slice(4, -2), cfg, 0.27, true);
+  assert.ok(d.dataWindows > 0);
+  assert.equal(d.markerMask, 0);
+  assert.equal(d.syncs, 0);
+  assert.equal(d.headers, 0);
+  assert.equal(d.maxReadable, 0);
+  assert.equal(d.frames, 0);
+});
+
+test('Diagnostics: markers are not a valid start sequence and bad length is a separate failure', () => {
+  const cfg = c.config('reliable', 48000), wrong = c.frame('HELLO');
+  wrong[1].value = 0;
+  const noSync = decodeSymbols(wrong, cfg, 0.27, true).diagnostics;
+  assert.equal(noSync.markerMask, 3);
+  assert.equal(noSync.syncs, 0);
+  const invalid = c.frame('HELLO');
+  invalid[4].value = 255;
+  const d = decodeSymbols(invalid, cfg, 0.27, true).diagnostics;
+  assert.equal(d.syncs, 1);
+  assert.equal(d.lengthErrors, 1);
+  assert.equal(d.headers, 0);
+  assert.equal(d.maxReadable, 0);
+  assert.equal(d.frames, 0);
+});
+
+test('Diagnostics: incomplete repeats do not combine readable bytes or claim verification', () => {
+  const cfg = c.config('reliable', 48000), first = c.frame('HELLO'), second = c.frame('HELLO');
+  first[9] = null;
+  for (let i = 5; i < 9; i++) second[i] = null;
+  const d = decodeSymbols([...first, null, null, ...second], cfg, 0.27, true).diagnostics;
+  assert.equal(d.syncs, 2);
+  assert.equal(d.headers, 2);
+  assert.equal(d.maxReadable, 4);
+  assert.equal(d.readableLength, 5);
+  assert.equal(d.frames, 2);
+  assert.equal(d.validFrames, 0);
+  assert.equal(d.crcFailures, 2);
+});
+
+test('Diagnostics: success and polling gaps are measured and snapshots cannot change decoder state', () => {
+  const cfg = c.config('reliable', 48000);
+  const d = decodeSymbols(c.frame('HELLO'), cfg, 0.27, true).diagnostics;
+  assert.equal(d.validFrames, 1);
+  assert.equal(d.maxReadable, 5);
+  assert.equal(d.lengthErrors + d.crcFailures + d.endFailures + d.utf8Failures, 0);
+  const decoder = c.createDecoder(cfg), quiet = c.demodulate(spectrum(null, cfg), cfg);
+  decoder.push(0, quiet); decoder.push(0.096, quiet);
+  assert.equal(decoder.diagnostics().maxGap, 0.096);
+  const copy = decoder.diagnostics(); copy.validFrames = 99;
+  assert.equal(decoder.diagnostics().validFrames, 0);
+});
 
 for (const text of ['', 'HELLO', '1234567890123456', '日本語', '😀😀😀😀', '<script>']) {
   test(`A: UTF-8 round trip for ${JSON.stringify(text)}`, () => {

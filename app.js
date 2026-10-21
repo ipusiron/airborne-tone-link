@@ -10,6 +10,8 @@
   let theme = stored('theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
   let errorKey = '', inputError = '', statusKey = 'waiting', busy = false, generation = 0;
   let environment = null, result = null, resultRole = null, expected = null, live = null, confirmResolve = null;
+  let diagnostics = null;
+  let deviceInfo = { microphone: null, speaker: null }, deviceStatus = 'deviceWaiting', deviceTest = null, microphoneLevel = null;
   const audio = window.AirborneAudio.create();
   const t = key => messages[language][key] || key;
   const plots = Object.fromEntries([['transmit', 'transmit-spectrogram', 'transmit-tone-pair'],
@@ -148,9 +150,11 @@
   }
 
   function renderState() {
+    renderDevices();
     $('status').textContent = t(statusKey);
     $('error').textContent = t(($('send-fields').hidden ? '' : inputError) || errorKey);
     const role = resultRole || $('role').value;
+    renderDiagnostics(role);
     $('transmit-source').textContent = t(['send', 'loopback'].includes(role) ? 'transmitSource' : 'noTransmitSource');
     $('receive-source').textContent = t(role === 'send' ? 'noReceiveSource' : role === 'offline' ? 'sourceWav' : 'receiveSource');
     $('live-source').textContent = t(role === 'send' ? 'sourceSend' : role === 'offline' ? 'sourceWav' : 'sourceMic');
@@ -187,6 +191,88 @@
     }
   }
 
+  function renderDevices() {
+    $('device-microphone').textContent = deviceInfo.microphone || t('deviceUnconfirmed');
+    $('device-speaker').textContent = `${t('systemOutput')}` +
+      (deviceInfo.speaker ? `: ${deviceInfo.speaker}` : ` (${t('deviceUnconfirmed')})`);
+    $('device-status').textContent = t(deviceStatus) + (deviceStatus === 'deviceTestFailed' && errorKey ? ` ${t(errorKey)}` : '');
+    $('microphone-level').hidden = !microphoneLevel;
+    if (microphoneLevel) {
+      $('microphone-meter').value = microphoneLevel.db;
+      $('microphone-level-value').textContent = `${microphoneLevel.db.toFixed(1)}dBFS / ` +
+        `${t('maximum')}: ${microphoneLevel.maximum.toFixed(1)}dBFS`;
+    }
+  }
+
+  async function updateDevices(token) {
+    const current = await audio.devices();
+    if (token !== generation) return;
+    deviceInfo = { microphone: current.microphoneActive ? current.microphone : deviceInfo.microphone, speaker: current.speaker };
+    renderDevices();
+  }
+
+  async function runDeviceTest(kind) {
+    if (busy) return;
+    const token = ++generation;
+    deviceTest = kind;
+    deviceStatus = kind === 'speaker' ? 'speakerTesting' : 'devicesChecking';
+    statusKey = 'deviceTesting'; errorKey = '';
+    microphoneLevel = null;
+    setBusy(true); renderState();
+    try {
+      await audio.open(kind === 'speaker' ? 'send' : 'receive');
+      if (token !== generation) return;
+      await updateDevices(token);
+      if (token !== generation) return;
+      if (kind === 'microphone') {
+        deviceStatus = 'microphoneTesting'; renderDevices();
+        await audio.testMicrophone(level => {
+          if (token === generation) { microphoneLevel = level; renderDevices(); }
+        });
+      } else if (kind === 'speaker') await audio.testSpeaker();
+      if (token !== generation) return;
+      deviceStatus = kind === 'microphone' ? 'microphoneTestDone' : kind === 'speaker' ? 'speakerTestDone' : 'devicesChecked';
+      statusKey = 'completed';
+    } catch (error) {
+      if (token !== generation || error.message === 'cancelled') return;
+      errorKey = messages[language][error.message] ? error.message : 'unexpected';
+      deviceStatus = 'deviceTestFailed'; statusKey = 'stopped';
+    } finally {
+      if (token === generation) {
+        await audio.close();
+        if (token !== generation) return;
+        deviceTest = null; setBusy(false); renderState();
+      }
+    }
+  }
+
+  function renderDiagnostics(role) {
+    $('receive-diagnostics').hidden = role === 'send';
+    const d = diagnostics;
+    if (!d || !d.windows) {
+      $('diagnostic-summary').textContent = t('diagnosticWaiting');
+      $('diagnostic-details').textContent = '';
+      return;
+    }
+    const state = d.validFrames ? 'diagnosticSuccess' : d.frames ? 'diagnosticInvalid' :
+      d.headers ? (d.maxReadable ? 'diagnosticIncomplete' : 'diagnosticNoBody') : d.syncs ? 'diagnosticNoHeader' :
+        d.dataWindows || d.markerMask ? 'diagnosticNoSync' : 'diagnosticNoTone';
+    $('diagnostic-summary').textContent = t(state);
+    const markers = (d.markerMask & 1 ? 1 : 0) + (d.markerMask & 2 ? 1 : 0);
+    const lines = [
+      `${t('diagnosticTones')}: ${t(d.dataWindows ? 'detected' : 'notDetected')}`,
+      `${t('diagnosticMarkers')}: ${markers}/2 / ${t('diagnosticSyncs')}: ${d.syncs}`,
+      `${t('diagnosticHeader')}: ${d.syncs ? `${t('diagnosticRead')}${d.headers} / ` +
+        `${t('diagnosticFailed')}${d.lengthErrors}` : t('notReached')}`,
+      `${t('diagnosticPayload')}: ${d.headers ? `${d.maxReadable}/${d.readableLength}${t('unitsBytes')}` : t('notReached')}`,
+      `${t('diagnosticFrames')}: ${d.frames ? `${t('diagnosticPassed')}${d.validFrames} / ` +
+        `${t('diagnosticFailed')}${d.frames - d.validFrames}` : t('notReached')}`,
+      d.frames ? `CRC: ${t('diagnosticFailed')}${d.crcFailures} / ${t('diagnosticEnd')}: ${d.endFailures} / UTF-8: ${d.utf8Failures}` : '',
+      `${t('diagnosticGap')}: ${(d.maxGap * 1000).toFixed(1)}ms`
+    ];
+    $('diagnostic-details').textContent = lines.filter(Boolean).join('\n');
+  }
+
   function render() {
     document.documentElement.lang = language;
     document.documentElement.dataset.theme = theme;
@@ -207,6 +293,8 @@
       node.disabled = value;
     }
     $('repeat-count').disabled = value || ['receive', 'offline'].includes($('role').value);
+    for (const id of ['check-devices', 'test-microphone', 'test-speaker']) $(id).disabled = value;
+    $('device-stop').disabled = !value;
     $('start').disabled = value;
     $('stop').disabled = !value;
   }
@@ -217,6 +305,7 @@
     confirmResolve = null;
     if ($('processing-dialog').open) $('processing-dialog').close();
     audio.close();
+    if (deviceTest) { deviceStatus = 'deviceTestStopped'; deviceTest = null; }
     $('wav-input').value = '';
     setBusy(false);
     statusKey = 'stopped';
@@ -239,6 +328,7 @@
   }
 
   function handleEvent(event) {
+    if (event.type === 'diagnostics') diagnostics = event.value;
     if (event.type === 'status') statusKey = event.key;
     if (event.type === 'sync') { statusKey = 'synchronized'; live = null; }
     if (event.type === 'byte') live = event;
@@ -265,6 +355,7 @@
     errorKey = inputError = '';
     result = null;
     live = null;
+    diagnostics = null;
     resultRole = role;
     expected = role === 'loopback' ? $('text-input').value : null;
     statusKey = 'pending';
@@ -280,6 +371,8 @@
         const details = await audio.open(role, key => { if (token === generation) { statusKey = key; renderState(); } });
         if (token !== generation) return;
         environment = details;
+        await updateDevices(token);
+        if (token !== generation) return;
         renderState();
         if (!core.config(mode, details.sampleRate, options()).supported) throw new Error('unsupportedBand');
         if (details.processing.echoCancellation === 'on' || details.processing.noiseSuppression === 'on') {
@@ -309,7 +402,7 @@
   }
 
   function clearResults() {
-    result = live = resultRole = expected = null;
+    result = live = resultRole = expected = diagnostics = null;
     statusKey = 'waiting';
     errorKey = '';
     plotReset(document.querySelector('input[name="mode"]:checked').value);
@@ -335,6 +428,10 @@
   $('lang-toggle').addEventListener('click', () => { language = language === 'ja' ? 'en' : 'ja'; save('lang', language); render(); });
   $('theme-toggle').addEventListener('click', () => { theme = theme === 'light' ? 'dark' : 'light'; save('theme', theme); render(); });
   $('start').addEventListener('click', start);
+  $('check-devices').addEventListener('click', () => runDeviceTest('check'));
+  $('test-microphone').addEventListener('click', () => runDeviceTest('microphone'));
+  $('test-speaker').addEventListener('click', () => runDeviceTest('speaker'));
+  $('device-stop').addEventListener('click', stop);
   $('stop').addEventListener('click', stop);
   $('help-toggle').addEventListener('click', () => { if (busy) stop(); $('help-dialog').showModal(); });
   $('help-close').addEventListener('click', () => { $('help-dialog').close(); });
@@ -351,6 +448,12 @@
   $('processing-cancel').addEventListener('click', () => answerProcessing(false));
   $('processing-dialog').addEventListener('cancel', event => { event.preventDefault(); answerProcessing(false); });
   audio.onInterrupted(key => { errorKey = key; stop(); });
+  if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
+    navigator.mediaDevices.addEventListener('devicechange', () => {
+      if (busy) stop();
+      deviceInfo = { microphone: null, speaker: null }; deviceStatus = 'devicesChanged'; renderDevices();
+    });
+  }
   document.addEventListener('visibilitychange', () => { if (document.hidden && busy) stop(); });
   window.addEventListener('pagehide', stop);
   window.addEventListener('load', drawPlot);
