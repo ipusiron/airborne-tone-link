@@ -22,9 +22,13 @@ function app(run, plot = null) {
   nodes.role.value = 'loopback';
   nodes['text-input'].value = 'SECRET';
   nodes.gain.value = '-30';
-  nodes.spectrogram.getContext = () => plot && plot.pen;
-  nodes.spectrogram.clientWidth = plot ? 320 : 0;
-  nodes.spectrogram.clientHeight = plot ? 220 : 0;
+  nodes.timing.value = 'short';
+  nodes['repeat-count'].value = '2';
+  for (const id of ['spectrogram', 'transmit-spectrogram']) {
+    nodes[id].getContext = () => plot && plot.pen;
+    nodes[id].clientWidth = plot ? 320 : 0;
+    nodes[id].clientHeight = plot ? 220 : 0;
+  }
   const document = {
     documentElement: { dataset: {} }, body: { dataset: {} }, addEventListener() {},
     getElementById: id => nodes[id],
@@ -46,7 +50,9 @@ function app(run, plot = null) {
   return {
     nodes, start: () => nodes.start.listeners.click(), loaded: () => window.listeners.load(),
     changeRole(value) { nodes.role.value = value; nodes.role.listeners.change(); },
-    changeMode() { mode = modes[1]; mode.listeners.change(); }
+    changeMode() { mode = modes[1]; mode.listeners.change(); },
+    changeTiming(value) { nodes.timing.value = value; nodes.timing.listeners.change(); },
+    changeRepeats(value) { nodes['repeat-count'].value = String(value); nodes['repeat-count'].listeners.change(); }
   };
 }
 const byte = (bytes, text) => ({ type: 'byte', bytes, text });
@@ -139,4 +145,26 @@ test('UI: unavailable computed plot colors do not crash initialization and load 
   plot.color = '#f6f5f0';
   view.loaded();
   assert.ok(fills > 0);
+});
+
+test('UI: changing band preserves common timing and count and forwards them to audio', async () => {
+  const seen = [];
+  const view = app(async (_role, _text, mode, _db, _emit, options) => {
+    seen.push({ mode, ...options });
+    return frame([0x41], 'A', true);
+  });
+  await view.start();
+  view.changeTiming('long');
+  view.changeRepeats(1);
+  view.changeMode();
+  assert.equal(view.nodes.timing.value, 'long');
+  assert.equal(view.nodes['repeat-count'].value, '1');
+  await view.start();
+  assert.deepEqual(seen, [{ mode: 'reliable', timing: 'short', repeats: 2 },
+    { mode: 'ultrasonic', timing: 'long', repeats: 1 }]);
+  view.changeRole('receive');
+  assert.equal(view.nodes['repeat-count'].disabled, true);
+  assert.equal(view.nodes['transmit-source'].textContent, messages.en.noTransmitSource);
+  view.changeRole('send');
+  assert.equal(view.nodes['receive-source'].textContent, messages.en.noReceiveSource);
 });

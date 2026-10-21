@@ -172,9 +172,33 @@ test('E: unknown expected content never receives an agreement percentage', () =>
   assert.equal(c.matchRate(null, 'HELLO', 'offline'), null);
 });
 test('E: duration includes the frame overhead, repeat gap and silence', () => {
-  assert.equal(c.duration(16, 'reliable'), 0.75 + 48 * 0.192);
-  assert.equal(c.duration(16, 'ultrasonic'), 0.5 + 24 * 0.085);
+  assert.equal(c.duration(16, 'reliable'), 0.75 + 48 * 0.085);
+  assert.equal(c.duration(16, 'ultrasonic'), 0.75 + 48 * 0.085);
   assert.throws(() => c.duration(17, 'reliable'), /invalidLength/);
+});
+for (const timing of ['short', 'long']) {
+  for (const repeats of [1, 2]) {
+    test(`E: ${timing}, ${repeats} transmissions have equal timing in both bands`, () => {
+      const options = { timing, repeats }, seconds = timing === 'short' ? 0.085 : 0.192;
+      const a = c.config('reliable', 48000, options), b = c.config('ultrasonic', 48000, options);
+      assert.equal(a.symbol, seconds);
+      assert.equal(b.symbol, seconds);
+      assert.equal(a.repeats, repeats);
+      assert.equal(b.repeats, repeats);
+      const expected = 0.5 + 24 * seconds * repeats + 0.25 * (repeats - 1);
+      assert.equal(c.duration(16, 'reliable', options), expected);
+      assert.equal(c.duration(16, 'ultrasonic', options), expected);
+      assert.equal(b.tones[0] - a.tones[0], 14500);
+    });
+  }
+}
+test('E: timing defaults and invalid controls are enforced', () => {
+  const cfg = c.config('ultrasonic', 48000);
+  assert.equal(cfg.timing, 'short');
+  assert.equal(cfg.repeats, 2);
+  for (const options of [{ timing: 'medium' }, { timing: 'constructor' }, { repeats: 0 }, { repeats: 3 }, { repeats: '2' }]) {
+    assert.throws(() => c.config('reliable', 48000, options), /invalidSettings/);
+  }
 });
 test('E: requested processing values are not substituted for unreported values', () => {
   assert.deepEqual(c.processing({ echoCancellation: false, noiseSuppression: true }),

@@ -12,21 +12,31 @@
   let environment = null, result = null, resultRole = null, expected = null, live = null, confirmResolve = null;
   const audio = window.AirborneAudio.create();
   const t = key => messages[language][key] || key;
-  const canvas = $('spectrogram'), pen = canvas.getContext('2d');
+  const plots = Object.fromEntries([['transmit', 'transmit-spectrogram', 'transmit-tone-pair'],
+    ['receive', 'spectrogram', 'tone-pair']].map(([side, id, pair]) => {
+    const canvas = $(id);
+    return [side, { side, canvas, pen: canvas.getContext('2d'), pair, columns: [], lastColumn: -Infinity, selectedTones: null }];
+  }));
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
-  let columns = [], plotSettings = core.config('reliable', 48000), plotStart = null;
-  let lastColumn = -Infinity, lastPaint = -Infinity, selectedTones = null;
+  const options = () => ({ timing: $('timing').value, repeats: Number($('repeat-count').value) });
+  let plotSettings = core.config('reliable', 48000), plotStart = null, lastPaint = -Infinity;
 
   function plotReset(mode) {
-    columns = [];
-    plotSettings = core.config(mode, 48000);
+    for (const plot of Object.values(plots)) {
+      plot.columns = []; plot.lastColumn = -Infinity; plot.selectedTones = null;
+    }
+    plotSettings = core.config(mode, 48000, options());
     plotStart = null;
-    lastColumn = lastPaint = -Infinity;
-    selectedTones = null;
+    lastPaint = -Infinity;
     drawPlot();
   }
 
   function drawPlot() {
+    for (const plot of Object.values(plots)) drawChannel(plot);
+  }
+
+  function drawChannel(plot) {
+    const { canvas, pen, columns, selectedTones } = plot;
     const width = canvas.clientWidth, height = canvas.clientHeight, ratio = Math.min(devicePixelRatio || 1, 2);
     if (!width || !height || !pen) return;
     canvas.width = Math.round(width * ratio);
@@ -40,7 +50,8 @@
     if (!low || !high) return;
     const left = 58, top = 12, plotWidth = width - left - 10, plotHeight = height - top - 34;
     const rowHeight = plotHeight / 32, span = 12;
-    const end = columns.length ? columns.at(-1).time : 0, start = Math.max(0, end - span);
+    const end = Math.max(...Object.values(plots).map(p => p.columns.at(-1)?.time || 0));
+    const start = Math.max(0, end - span);
     const x = time => left + (time - start) / span * plotWidth;
     const y = index => top + (31 - index) * rowHeight;
     pen.fillStyle = color('plot-bg');
@@ -59,7 +70,8 @@
     for (let i = 0; i <= 32; i++) {
       pen.beginPath(); pen.moveTo(left, top + i * rowHeight); pen.lineTo(width - 10, top + i * rowHeight); pen.stroke();
     }
-    const measuredEnd = Math.min(width - 10, x(end + (columns.length ? 0.032 : 0)));
+    const channelEnd = columns.at(-1)?.time || 0;
+    const measuredEnd = Math.max(left, Math.min(width - 10, x(channelEnd + (columns.length ? 0.032 : 0))));
     const unmeasuredWidth = width - 10 - measuredEnd;
     if (unmeasuredWidth > 0) {
       pen.fillStyle = color('surface');
@@ -88,20 +100,21 @@
       const time = start + i * 4;
       pen.fillText(`${time.toFixed(0)}s`, Math.min(width - 16, x(time)), height - 8);
     }
-    $('tone-pair').textContent = selectedTones ? `${t('selectedTones')}: ${selectedTones.join('Hz + ')}Hz` : t('noTone');
+    $(plot.pair).textContent = selectedTones ? `${t('selectedTones')}: ${selectedTones.join('Hz + ')}Hz` : t('noTone');
   }
 
   function plotSample(event) {
+    const plot = plots[event.side || 'receive'];
     if (plotStart === null) plotStart = event.time;
     plotSettings = event.settings;
-    if (event.time - lastColumn < 0.032) return;
-    lastColumn = event.time;
+    if (event.time - plot.lastColumn < 0.032) return;
+    plot.lastColumn = event.time;
     const value = event.decision.kind === 'data' ? event.decision.value : null;
     const selected = value === null ? null : [value >> 4, 16 + (value & 15)];
-    if (selected) selectedTones = selected.map(i => plotSettings.tones[i]);
+    if (selected) plot.selectedTones = selected.map(i => plotSettings.tones[i]);
     const db = event.decision.powers.map(power => 10 * Math.log10(Math.max(1e-12, power)));
-    columns.push({ time: event.time - plotStart, selected, db });
-    if (columns.length > 400) columns.shift();
+    plot.columns.push({ time: event.time - plotStart, selected, db });
+    if (plot.columns.length > 400) plot.columns.shift();
     const now = performance.now();
     if (now - lastPaint >= (reduced.matches ? 250 : 50)) { lastPaint = now; drawPlot(); }
   }
@@ -118,12 +131,26 @@
       inputError = error.message;
     }
     $('error').textContent = t(($('send-fields').hidden ? '' : inputError) || errorKey);
+    renderSettings();
+  }
+
+  function renderSettings() {
+    const mode = document.querySelector('input[name="mode"]:checked').value;
+    const cfg = core.config(mode, 48000, options()), seconds = core.duration(16, mode, options());
+    const values = { symbol: `${cfg.symbol * 1000}ms`, repeats: String(cfg.repeats),
+      nominal: `${(1 / (cfg.symbol * cfg.repeats)).toFixed(2)}B/s`, duration: `${seconds.toFixed(3)}s`,
+      net: `${(16 / seconds).toFixed(2)}B/s` };
+    document.querySelectorAll('[data-metric]').forEach(node => { node.textContent = values[node.dataset.metric]; });
+    const count = ['send', 'loopback'].includes($('role').value) ? `${t('repeatCount')}: ${cfg.repeats}` : t('countNotMeasured');
+    $('comparison-settings').textContent = `${t(mode)} / ${t('timing')}: ${cfg.symbol * 1000}ms / ${count}`;
   }
 
   function renderState() {
     $('status').textContent = t(statusKey);
     $('error').textContent = t(($('send-fields').hidden ? '' : inputError) || errorKey);
     const role = resultRole || $('role').value;
+    $('transmit-source').textContent = t(['send', 'loopback'].includes(role) ? 'transmitSource' : 'noTransmitSource');
+    $('receive-source').textContent = t(role === 'send' ? 'noReceiveSource' : role === 'offline' ? 'sourceWav' : 'receiveSource');
     $('live-source').textContent = t(role === 'send' ? 'sourceSend' : role === 'offline' ? 'sourceWav' : 'sourceMic');
     const known = live ? live.bytes.filter(byte => byte !== null).length : 0;
     $('live-text').textContent = known ? live.text || t('incompleteCharacter') : t('noRecoveredText');
@@ -174,7 +201,10 @@
   function setBusy(value) {
     busy = value;
     document.body.dataset.busy = String(value);
-    for (const node of document.querySelectorAll('input[name="mode"],#role,#text-input,#gain,#wav-input')) node.disabled = value;
+    for (const node of document.querySelectorAll('input[name="mode"],#timing,#repeat-count,#role,#text-input,#gain,#wav-input')) {
+      node.disabled = value;
+    }
+    $('repeat-count').disabled = value || ['receive', 'offline'].includes($('role').value);
     $('start').disabled = value;
     $('stop').disabled = !value;
   }
@@ -243,18 +273,18 @@
       const onEvent = event => { if (token === generation) handleEvent(event); };
       let received;
       if (role === 'offline') {
-        received = await audio.offline($('wav-input').files[0], mode, onEvent);
+        received = await audio.offline($('wav-input').files[0], mode, onEvent, options());
       } else {
         const details = await audio.open(role, key => { if (token === generation) { statusKey = key; renderState(); } });
         if (token !== generation) return;
         environment = details;
         renderState();
-        if (!core.config(mode, details.sampleRate).supported) throw new Error('unsupportedBand');
+        if (!core.config(mode, details.sampleRate, options()).supported) throw new Error('unsupportedBand');
         if (details.processing.echoCancellation === 'on' || details.processing.noiseSuppression === 'on') {
           if (!await confirmProcessing()) { if (token === generation) stop(); return; }
           if (token !== generation) return;
         }
-        received = await audio.run(role, $('text-input').value, mode, Number($('gain').value), onEvent);
+        received = await audio.run(role, $('text-input').value, mode, Number($('gain').value), onEvent, options());
       }
       if (token !== generation) return;
       result = received;
@@ -281,6 +311,7 @@
     statusKey = 'waiting';
     errorKey = '';
     plotReset(document.querySelector('input[name="mode"]:checked').value);
+    renderSettings();
     renderState();
   }
 
@@ -288,6 +319,7 @@
     const role = $('role').value;
     $('send-fields').hidden = !['send', 'loopback'].includes(role);
     $('file-fields').hidden = role !== 'offline';
+    $('repeat-count').disabled = ['receive', 'offline'].includes(role);
     clearResults();
   }
   $('text-input').addEventListener('input', () => { errorKey = ''; preview(); });
@@ -295,6 +327,7 @@
   document.querySelectorAll('input[name="mode"]').forEach(node => node.addEventListener('change', () => {
     if (!busy) clearResults();
   }));
+  for (const id of ['timing', 'repeat-count']) $(id).addEventListener('change', () => { if (!busy) clearResults(); });
   $('wav-input').addEventListener('change', () => { errorKey = ''; renderState(); });
   $('gain').addEventListener('input', () => { $('gain-value').textContent = `${$('gain').value}dBFS`; });
   $('lang-toggle').addEventListener('click', () => { language = language === 'ja' ? 'en' : 'ja'; save('lang', language); render(); });
@@ -311,7 +344,8 @@
   document.addEventListener('visibilitychange', () => { if (document.hidden && busy) stop(); });
   window.addEventListener('pagehide', stop);
   window.addEventListener('load', drawPlot);
-  new ResizeObserver(drawPlot).observe(canvas);
+  const observer = new ResizeObserver(drawPlot);
+  for (const plot of Object.values(plots)) observer.observe(plot.canvas);
   document.body.dataset.busy = 'false';
   render();
   roleChanged();

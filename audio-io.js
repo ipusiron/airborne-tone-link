@@ -8,7 +8,7 @@
 
   function create(host = globalThis) {
     const nav = host.navigator || {};
-    let context = null, stream = null, track = null, input = null, analyser = null, source = null;
+    let context = null, stream = null, track = null, input = null, analyser = null, outputAnalyser = null, source = null;
     let settings = {}, session = 'unreported', generation = 0, active = false, trackHandler = null;
     let interrupted = () => {};
     const pending = new Set();
@@ -39,7 +39,8 @@
       if (stream) stream.getTracks().forEach(t => t.stop());
       if (input) input.disconnect();
       if (analyser) analyser.disconnect();
-      stream = track = input = analyser = trackHandler = null;
+      if (outputAnalyser && outputAnalyser !== analyser) outputAnalyser.disconnect();
+      stream = track = input = analyser = outputAnalyser = trackHandler = null;
     }
 
     async function close() {
@@ -139,7 +140,13 @@
         if (microphone) {
           input = context.createMediaStreamSource(stream);
           input.connect(analyser);
-        } else if (role === 'send') analyser.connect(context.destination);
+        }
+        if (role === 'send' || role === 'loopback') {
+          outputAnalyser = role === 'send' ? analyser : context.createAnalyser();
+          outputAnalyser.fftSize = core.FFT_SIZE;
+          outputAnalyser.smoothingTimeConstant = 0;
+          outputAnalyser.connect(context.destination);
+        }
       } catch (_) { stop(); throw new Error('microphoneError'); }
       active = true;
       return info();
@@ -192,9 +199,9 @@
       await wait(0.1, token);
     }
 
-    async function run(role, text, mode, db, onEvent = () => {}) {
+    async function run(role, text, mode, db, onEvent = () => {}, options = {}) {
       if (!active || !context) throw new Error('cancelled');
-      const token = generation, cfg = core.config(mode, context.sampleRate);
+      const token = generation, cfg = core.config(mode, context.sampleRate, options);
       if (!cfg.supported) throw new Error('unsupportedBand');
       if (role === 'loopback') await selfCheck(db, key => onEvent({ type: 'status', key }));
       const decoder = core.createDecoder(cfg);
@@ -202,7 +209,7 @@
       if (role !== 'receive') {
         const wave = core.transmission(text, cfg, db);
         // The loopback path deliberately has no direct connection to the analyser.
-        emitted = emit(wave.samples, role === 'send' ? analyser : context.destination);
+        emitted = emit(wave.samples, outputAnalyser);
         deadline = host.performance.now() + Math.min(60000, (wave.duration + info().outputLatency + 0.6) * 1000);
       }
       onEvent({ type: 'status', key: role === 'receive' ? 'receiving' : 'transmitting' });
@@ -219,7 +226,13 @@
         previous = current.time;
         lastAdvance = host.performance.now();
         const decision = core.demodulate(current.spectrum, cfg);
-        onEvent({ type: 'spectrum', ...current, decision, settings: cfg });
+        if (role === 'loopback') {
+          const spectrum = new Float32Array(outputAnalyser.frequencyBinCount);
+          outputAnalyser.getFloatFrequencyData(spectrum);
+          onEvent({ type: 'spectrum', side: 'transmit', spectrum, time: current.time,
+            decision: core.demodulate(spectrum, cfg), settings: cfg });
+        }
+        onEvent({ type: 'spectrum', side: role === 'send' ? 'transmit' : 'receive', ...current, decision, settings: cfg });
         for (const event of decoder.push(current.time, decision)) {
           onEvent(event);
           if (event.type === 'frame' && (!result || event.valid || !result.valid)) result = event;
@@ -232,7 +245,7 @@
       return result;
     }
 
-    async function offline(file, mode, onEvent = () => {}) {
+    async function offline(file, mode, onEvent = () => {}, options = {}) {
       stop();
       active = true;
       const token = generation;
@@ -243,7 +256,7 @@
         if (token !== generation) throw new Error('cancelled');
         pcm = core.decodeWav(buffer);
         buffer = null;
-        const cfg = core.config(mode, pcm.rate);
+        const cfg = core.config(mode, pcm.rate, options);
         if (!cfg.supported) throw new Error('unsupportedBand');
         onEvent({ type: 'environment', value: { sampleRate: pcm.rate, inputSampleRate: null, session: 'offlineSession',
           processing: core.processing(), channelCount: pcm.channels } });
@@ -254,7 +267,7 @@
           if (token !== generation) throw new Error('cancelled');
           const spectrum = core.spectrumOf(pcm.samples, offset);
           const time = (offset + core.FFT_SIZE / 2) / pcm.rate, decision = core.demodulate(spectrum, cfg);
-          onEvent({ type: 'spectrum', spectrum, time, decision, settings: cfg });
+          onEvent({ type: 'spectrum', side: 'receive', spectrum, time, decision, settings: cfg });
           for (const event of decoder.push(time, decision)) {
             onEvent(event);
             if (event.type === 'frame' && (!result || event.valid || !result.valid)) result = event;
