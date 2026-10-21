@@ -124,11 +124,11 @@
   function preview() {
     try {
       const bytes = core.bytesOf($('text-input').value);
-      $('byte-count').textContent = `${bytes.length} / 16 ${t('unitsBytes')}`;
+      $('byte-count').textContent = `${bytes.length} / ${core.MAX_BYTES} ${t('unitsBytes')}`;
       $('byte-preview').textContent = bytes.map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(' ');
       inputError = '';
     } catch (error) {
-      $('byte-count').textContent = `${new TextEncoder().encode($('text-input').value).length} / 16 ${t('unitsBytes')}`;
+      $('byte-count').textContent = `${new TextEncoder().encode($('text-input').value).length} / ${core.MAX_BYTES} ${t('unitsBytes')}`;
       $('byte-preview').textContent = '';
       inputError = error.message;
     }
@@ -138,16 +138,21 @@
 
   function renderSettings() {
     const mode = document.querySelector('input[name="mode"]:checked').value;
-    const cfg = core.config(mode, 48000, options()), seconds = core.duration(16, mode, options());
+    const cfg = core.config(mode, 48000, options()), seconds = core.duration(core.MAX_BYTES, mode, options());
     const values = { symbol: `${cfg.symbol * 1000}ms`, repeats: String(cfg.repeats),
       nominal: `${(1 / (cfg.symbol * cfg.repeats)).toFixed(2)}B/s`, duration: `${seconds.toFixed(3)}s`,
-      net: `${(16 / seconds).toFixed(2)}B/s` };
+      net: `${(core.MAX_BYTES / seconds).toFixed(2)}B/s` };
     document.querySelectorAll('[data-metric]').forEach(node => { node.textContent = values[node.dataset.metric]; });
     const count = ['send', 'loopback'].includes($('role').value) ? `${t('repeatCount')}: ${cfg.repeats}` : t('countNotMeasured');
     $('comparison-settings').textContent = `${t(mode)} / ${t('timing')}: ${cfg.symbol * 1000}ms / ${count}`;
     const timingLabel = { short: 'shortTone', long: 'longTone', longer: 'longerTone' }[cfg.timing];
     $('timing-help-current').textContent = `${t('currentSelection')}: ${t(timingLabel)}`;
     $('repeat-help-current').textContent = `${t('currentSelection')}: ${t(cfg.repeats === 1 ? 'once' : 'twice')}`;
+    $('gain-help-current').textContent = `${t('currentSelection')}: ${$('gain').value}dBFS`;
+    try {
+      const length = core.bytesOf($('text-input').value).length;
+      $('send-duration').textContent = length ? `${t('sendDuration')}: ${core.duration(length, mode, options()).toFixed(3)}s` : '';
+    } catch (_) { $('send-duration').textContent = ''; }
   }
 
   function renderState() {
@@ -425,7 +430,7 @@
   }));
   for (const id of ['timing', 'repeat-count']) $(id).addEventListener('change', () => { if (!busy) clearResults(); });
   $('wav-input').addEventListener('change', () => { errorKey = ''; renderState(); });
-  $('gain').addEventListener('input', () => { $('gain-value').textContent = `${$('gain').value}dBFS`; });
+  $('gain').addEventListener('input', () => { $('gain-value').textContent = `${$('gain').value}dBFS`; renderSettings(); });
   $('lang-toggle').addEventListener('click', () => { language = language === 'ja' ? 'en' : 'ja'; save('lang', language); render(); });
   $('theme-toggle').addEventListener('click', () => { theme = theme === 'light' ? 'dark' : 'light'; save('theme', theme); render(); });
   $('start').addEventListener('click', start);
@@ -437,7 +442,7 @@
   $('help-toggle').addEventListener('click', () => { if (busy) stop(); $('help-dialog').showModal(); });
   $('help-close').addEventListener('click', () => { $('help-dialog').close(); });
   $('help-dialog').addEventListener('close', () => { $('help-toggle').focus(); });
-  for (const id of ['timing', 'repeat']) {
+  for (const id of ['timing', 'repeat', 'gain']) {
     $(`${id}-help`).addEventListener('click', () => {
       if (busy) stop();
       $(`${id}-dialog`).showModal();

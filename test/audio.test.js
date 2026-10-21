@@ -235,9 +235,50 @@ test('Audio: receive has a wall-clock deadline and does not read overdue frames'
   const f = setup();
   await f.audio.open('receive');
   await assert.rejects(f.audio.run('receive', '', 'reliable', -30), /noFrame/);
-  assert.equal(f.metrics().now, 60000);
-  assert.equal(f.metrics().reads, 7499);
+  assert.equal(f.metrics().now, 300000);
+  assert.equal(f.metrics().reads, 37499);
   await f.audio.close();
+});
+
+test('Audio: a 256-byte extra-long send completes both transmissions beyond the old 60-second deadline', async () => {
+  const cfg = core.config('ultrasonic', 48000, { timing: 'longer', repeats: 2 });
+  const text = '0123456789ABCDEF'.repeat(16), packet = core.frame(text), frames = [];
+  const f = setup({ spectrum(values, now) {
+    const start = f.sources[0].startTime + 0.25;
+    const elapsed = now / 1000 - core.FFT_SIZE / (2 * 48000) - start;
+    const pass = Math.floor(elapsed / (packet.length * 0.384 + 0.25));
+    const index = Math.floor((elapsed - pass * (packet.length * 0.384 + 0.25)) / 0.384);
+    const symbol = pass >= 0 && pass < 2 ? packet[index] : null;
+    if (symbol) {
+      const frequencies = symbol.kind === 'marker' ? [cfg.markers[symbol.value]] : core.byteTones(symbol.value, cfg);
+      for (const frequency of frequencies) values[core.frequencyBin(frequency, 48000)] = -30;
+    }
+  } });
+  await f.audio.open('send');
+  const result = await f.audio.run('send', text, 'ultrasonic', -30, e => {
+    if (e.type === 'frame') frames.push(e);
+  }, { timing: 'longer', repeats: 2 });
+  assert.ok(result.valid);
+  assert.equal(result.text, text);
+  assert.equal(frames.length, 2);
+  assert.ok(frames.every(e => e.valid && e.bytes.length === 256));
+  assert.ok(f.metrics().now > 205000 && f.metrics().now < 207000);
+  const source = f.sources[0];
+  assert.ok(Math.abs(source.stops[0] - source.startTime - 205.038) < 1e-8);
+  await f.audio.close();
+  assert.equal(f.contexts[0].state, 'closed');
+  assert.equal(f.metrics().timers, 0);
+});
+
+test('Audio: a maximum-length transmission still cancels and releases resources after 60 seconds', async () => {
+  const f = setup({ tick(now) { if (now >= 61000) f.audio.stop(); } });
+  await f.audio.open('send');
+  await assert.rejects(f.audio.run('send', 'A'.repeat(256), 'reliable', -30), /cancelled/);
+  assert.ok(f.metrics().now >= 61000 && f.metrics().now < 61100);
+  assert.equal(f.metrics().timers, 0);
+  assert.ok(f.sources[0].disconnected);
+  await f.audio.close();
+  assert.equal(f.contexts[0].state, 'closed');
 });
 test('Audio: a frozen audio clock terminates instead of waiting forever', async () => {
   const f = setup({ frozen: true });

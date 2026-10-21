@@ -85,9 +85,87 @@ for (const text of ['', 'HELLO', '1234567890123456', '日本語', '😀😀😀�
 }
 test('A: byte limit counts UTF-8 and rejects broken surrogate pairs', () => {
   assert.equal(c.bytesOf('日本語').length, 9);
-  assert.throws(() => c.bytesOf('a'.repeat(17)), /tooLong/);
-  assert.throws(() => c.bytesOf('😀'.repeat(5)), /tooLong/);
+  assert.equal(c.bytesOf('a'.repeat(256)).length, 256);
+  assert.equal(c.bytesOf('😀'.repeat(64)).length, 256);
+  assert.equal(c.bytesOf('日'.repeat(85) + 'A').length, 256);
+  assert.throws(() => c.bytesOf('a'.repeat(257)), /tooLong/);
+  assert.throws(() => c.bytesOf('😀'.repeat(65)), /tooLong/);
   for (const bad of ['\ud800', '\udc00', '\ud800x']) assert.throws(() => c.bytesOf(bad), /invalidUnicode/);
+});
+
+for (const [length, header] of [[0, [0]], [16, [16]], [254, [254]], [255, [255, 0, 255]], [256, [255, 1, 0]]]) {
+  test(`A: ${length}-byte frame has the specified wire header and independently calculated CRC`, () => {
+    const packet = c.frame('A'.repeat(length)), body = [...header, ...Array(length).fill(65)];
+    assert.deepEqual(packet.slice(4, 4 + header.length).map(s => s.value), header);
+    assert.equal(packet.length, length + header.length + 7);
+    let polynomial = body.reduce((bits, byte) => (bits << 8n) | BigInt(byte), 0n) << 8n;
+    for (let bit = BigInt(body.length * 8 + 7); bit >= 8n; bit--) {
+      if (polynomial & (1n << bit)) polynomial ^= 0x107n << (bit - 8n);
+    }
+    assert.equal(packet.at(-3).value, Number(polynomial));
+  });
+}
+
+for (const [length, timing] of [[254, 'short'], [255, 'long'], [256, 'longer']]) {
+  for (const mode of ['reliable', 'ultrasonic']) {
+    test(`B: ${length} bytes at ${timing} in ${mode} recover without exposing header bytes as text`, () => {
+      const text = '日'.repeat(Math.floor(length / 3)) + 'X'.repeat(length % 3);
+      const cfg = c.config(mode, 44100, { timing }), { events, diagnostics: d } = decodeSymbols(c.frame(text), cfg, 0.27, true);
+      const bytes = events.filter(e => e.type === 'byte'), frame = events.find(e => e.type === 'frame');
+      assert.equal(bytes.length, length);
+      assert.equal(bytes[0].index, 0);
+      assert.deepEqual(bytes[0].bytes, [0xe6]);
+      assert.equal(bytes.at(-1).index, length - 1);
+      assert.ok(frame.valid);
+      assert.equal(frame.text, text);
+      assert.equal(d.headers, 1);
+      assert.equal(d.maxReadable, length);
+      assert.equal(d.validFrames, 1);
+    });
+  }
+}
+
+test('B: malformed extended headers fail before any payload, and a later repeat can synchronize', () => {
+  const cfg = c.config('reliable', 48000);
+  for (const tail of [[0, 254], [1, 1], [255, 255], [null, 0], [1, null]]) {
+    const malformed = [...c.frame('').slice(0, 4),
+      ...[255, ...tail].map(value => value === null ? null : { kind: 'data', value }), null, null];
+    const { events, diagnostics: d } = decodeSymbols([...malformed, ...c.frame('OK')], cfg, 0.27, true);
+    assert.equal(d.lengthErrors, 1);
+    assert.equal(d.headers, 1);
+    assert.equal(d.maxReadable, 2);
+    assert.equal(events.filter(e => e.type === 'frame' && e.valid).at(-1).text, 'OK');
+  }
+});
+
+test('B: corrupt plausible long length cannot swallow the next valid preamble', () => {
+  const cfg = c.config('ultrasonic', 48000), first = c.frame('HELLO');
+  first[4].value = 254;
+  const { events, diagnostics: d } = decodeSymbols([...first, null, ...c.frame('HELLO')], cfg, 0.27, true);
+  assert.equal(d.syncs, 2);
+  assert.equal(events.filter(e => e.type === 'frame' && e.valid).at(-1).text, 'HELLO');
+});
+
+test('B: a damaged byte at the end of a 256-byte payload cannot pass verification', () => {
+  const packet = c.frame('A'.repeat(256));
+  packet[7 + 255].value = 66;
+  const events = decodeSymbols(packet, c.config('reliable', 48000, { timing: 'short' }));
+  const frame = events.find(e => e.type === 'frame');
+  assert.equal(frame.bytes.length, 256);
+  assert.equal(frame.crcOk, false);
+  assert.equal(frame.valid, false);
+});
+
+test('E: maximum payload durations include the three-byte header and stay within the receive limit', () => {
+  for (const [timing, repeats, seconds] of [
+    ['short', 1, 23.110], ['short', 2, 45.970], ['long', 1, 51.572],
+    ['long', 2, 102.894], ['longer', 1, 102.644], ['longer', 2, 205.038]
+  ]) {
+    for (const mode of ['reliable', 'ultrasonic']) {
+      assert.ok(Math.abs(c.duration(256, mode, { timing, repeats }) - seconds) < 1e-9);
+      assert.ok(seconds + 1 < c.MAX_SECONDS);
+    }
+  }
 });
 test('A: CRC-8/SMBUS published check value is F4 for 123456789', () => {
   assert.equal(c.crc8(new TextEncoder().encode('123456789')), 0xf4);
@@ -228,7 +306,7 @@ test('E: unknown expected content never receives an agreement percentage', () =>
 test('E: duration includes the frame overhead, repeat gap and silence', () => {
   assert.equal(c.duration(16, 'reliable'), 0.75 + 48 * 0.192);
   assert.equal(c.duration(16, 'ultrasonic'), 0.75 + 48 * 0.192);
-  assert.throws(() => c.duration(17, 'reliable'), /invalidLength/);
+  assert.throws(() => c.duration(257, 'reliable'), /invalidLength/);
 });
 for (const timing of ['short', 'long', 'longer']) {
   for (const repeats of [1, 2]) {

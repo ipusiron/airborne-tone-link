@@ -60,6 +60,26 @@ const byte = (bytes, text) => ({ type: 'byte', bytes, text });
 const frame = (bytes, text, valid) => ({ type: 'frame', bytes, text, valid, crcOk: valid,
   endOk: valid, utf8Ok: valid, confidences: bytes.map(() => 30) });
 
+test('UI: 256 UTF-8 bytes have a settings-dependent estimate and over-limit input clears the estimate', () => {
+  const view = app(async () => {}), nodes = view.nodes;
+  nodes['text-input'].value = '😀'.repeat(64);
+  nodes['text-input'].listeners.input();
+  assert.match(nodes['byte-count'].textContent, /^256 \/ 256/);
+  assert.equal(nodes.error.textContent, '');
+  assert.match(nodes['send-duration'].textContent, /102\.894s$/);
+  view.changeTiming('longer');
+  assert.match(nodes['send-duration'].textContent, /205\.038s$/);
+  view.changeRepeats(1);
+  assert.match(nodes['send-duration'].textContent, /102\.644s$/);
+  nodes['text-input'].value += 'A';
+  nodes['text-input'].listeners.input();
+  assert.equal(nodes.error.textContent, messages.en.tooLong);
+  assert.equal(nodes['send-duration'].textContent, '');
+  nodes.gain.value = '-12';
+  nodes.gain.listeners.input();
+  assert.match(nodes['gain-help-current'].textContent, /-12dBFS$/);
+});
+
 test('UI: no input events never copies send text into recovered text', async () => {
   const view = app(async () => { throw Error('noFrame'); });
   await view.start();

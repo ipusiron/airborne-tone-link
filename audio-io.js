@@ -245,12 +245,12 @@
       if (!cfg.supported) throw new Error('unsupportedBand');
       if (role === 'loopback') await selfCheck(db, key => onEvent({ type: 'status', key }));
       const decoder = core.createDecoder(cfg);
-      let emitted = null, deadline = host.performance.now() + 60000;
+      let emitted = null, deadline = host.performance.now() + core.MAX_SECONDS * 1000;
       if (role !== 'receive') {
         const wave = core.transmission(text, cfg, db);
         // The loopback path deliberately has no direct connection to the analyser.
         emitted = emit(wave.samples, outputAnalyser);
-        deadline = host.performance.now() + Math.min(60000, (wave.duration + info().outputLatency + 0.6) * 1000);
+        deadline = host.performance.now() + Math.min(core.MAX_SECONDS, wave.duration + info().outputLatency + 0.6) * 1000;
       }
       onEvent({ type: 'status', key: role === 'receive' ? 'receiving' : 'transmitting' });
       let previous = -Infinity, lastReport = -Infinity, lastAdvance = host.performance.now(), result = null;

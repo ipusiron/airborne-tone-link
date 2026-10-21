@@ -107,9 +107,13 @@
         <label for="text-input" data-i18n="input"></label>
         <textarea id="text-input" rows="2" autocomplete="off" spellcheck="false" autocapitalize="off">HELLO</textarea>
         <p id="byte-count" class="mono"></p>
+        <p id="send-duration" class="mono"></p>
         <p class="muted" data-i18n="inputHelp"></p>
         <p><span data-i18n="preview"></span>: <output id="byte-preview" class="mono"></output></p>
-        <label for="gain"><span data-i18n="level"></span> <output id="gain-value">−30dBFS</output></label>
+        <div class="field-label">
+          <label for="gain"><span data-i18n="level"></span> <output id="gain-value">−30dBFS</output></label>
+          <button id="gain-help" class="icon-button" type="button" data-label="gainHelp" aria-haspopup="dialog" aria-controls="gain-dialog"><span aria-hidden="true">?</span></button>
+        </div>
         <input id="gain" type="range" min="-60" max="-12" value="-30" step="1">
         <p class="muted" data-i18n="levelNote"></p>
       </div>
@@ -264,6 +268,17 @@
     <p data-i18n="helpOffline"></p>
     <p data-i18n="helpStop"></p>
     <button id="help-close" type="button" data-i18n="close"></button>
+  </dialog>
+  <dialog id="gain-dialog" class="setting-help-dialog" aria-labelledby="gain-help-title" aria-describedby="gain-help-intro">
+    <h2 id="gain-help-title" data-i18n="level"></h2>
+    <p id="gain-help-intro" data-i18n="gainHelpIntro"></p>
+    <ul>
+      <li data-i18n="gainHelpLouder"></li>
+      <li data-i18n="gainHelpQuieter"></li>
+    </ul>
+    <p data-i18n="gainHelpNote"></p>
+    <p id="gain-help-current" class="mono"></p>
+    <button id="gain-help-close" type="button" data-i18n="close" autofocus></button>
   </dialog>
   <dialog id="timing-dialog" class="setting-help-dialog" aria-labelledby="timing-help-title" aria-describedby="timing-help-intro">
     <h2 id="timing-help-title" data-i18n="timing"></h2>
