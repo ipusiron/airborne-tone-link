@@ -198,6 +198,144 @@ ggwave uses six simultaneous tones for three bytes and Reed–Solomon error corr
 This tool uses two simultaneous tones for one byte and CRC only; the protocols are incompatible.
 It implements the processing in classic scripts without compiled ggwave/quiet components, preserving the restrictive CSP and `file://` operation.
 
+## 🔊 Environmental noise and reception
+
+Whether a person can hear a noise does not determine its effect on reception.
+Components reaching the microphone at the frequencies and times used for communication can interfere with the two tones or the start sequence.
+The data bands are 1,500–4,414Hz for audible mode and 16,000–18,914Hz for near-ultrasonic mode.
+Start/end markers use 1,312/1,406Hz and 15,812/15,906Hz respectively.
+Interference with the markers can prevent reception even when the data band is quiet.
+
+“Inaudible noise” is not a synonym for white noise.
+**White noise** describes equal power in equal-width frequency bands. Real equipment has finite bandwidth; sufficient audible-band content can be heard as hiss.
+Low-frequency sound describes frequency, not whiteness. Japan's Ministry of the Environment uses approximately 1–100Hz, with 1–20Hz classified as infrasound.
+Also distinguish quiet sounds, high-pitched sounds that a person cannot readily hear, and electrical noise in the input circuit.
+See [NI's noise explanation](https://download.ni.com/support/manuals/370192c.pdf) and [the Ministry's low-frequency sound guide](https://www.env.go.jp/content/900405790.pdf).
+
+The table describes possible effects inferred from sound characteristics and this decoder's design. It is not a measurement of each source or a device-specific success-rate table.
+Operating state, distance, placement and input gain can change the result for the same equipment.
+
+| Example source | Relevant characteristics | Effect on audible mode | Effect on near-ultrasonic mode |
+|---|---|---|---|
+| High-pitched noise from peripherals, power supplies or displays | Tonal components such as coil whine; not necessarily white noise | Components overlapping the communication band can interfere with particular tone candidates | Components around 16–19kHz can interfere even when a person cannot readily hear them |
+| Speaker hiss, microphone or input-circuit noise | Broadband acoustic noise versus electrical input noise that does not travel through air | In-band noise can reduce the power difference between candidates | Similar if the noise actually extends into this band; audible hiss alone does not reveal its high-frequency level |
+| Refrigerator, outdoor HVAC unit or ventilation hum | Low-frequency compressor/fan components, vibration and harmonics | Pure low-frequency components are outside the band; harmonics or rattling can still overlap it | Little direct overlap from pure low frequencies; input overload and device processing are separate issues |
+| Air-conditioner or fan airflow | Continuous broadband components, including air blowing directly on the microphone | Overlapping airflow noise can reduce reception margin throughout a transmission | Depends on high-frequency content and direct airflow; low-frequency dominance does not prove zero effect |
+| Keyboard typing | Short impacts, desk vibration and repeated keystrokes | An overlapping impact can disrupt payload or marker decisions | Impacts with sufficient high-frequency content can interfere; this mode is not always better |
+| Mouse clicks | Brief impacts that may occur close to the microphone | Even one click can cause an erasure or wrong decision if it overlaps the decision window | Depends on high-frequency content and distance; brevity alone does not make it negligible |
+| Video, music or notification playback | A mixture of speech, effects and music; waveforms mix when sharing an output device | Overlapping content can interfere during playback | Depends on high-frequency content and output distortion; video audio is not necessarily free of these components |
+| Household conversation, dishes, doors or running water | A mixture of sustained and sudden sounds | Spectral overlap or an impact during a decision window can interfere | Low-frequency speech components alone have little direct overlap; high-frequency dish sounds need separate consideration |
+| Outdoor vehicle engines and road noise | Low-frequency engine components plus tire and other noise | The in-band components remaining after attenuation by distance/windows matter | Low hum alone has little direct overlap; broadband components and input overload can still matter |
+| Intercoms, bells or alarms | Sustained pitches, harmonics and abrupt onsets | Overlap with a tone or marker can disrupt several successive bytes | Even a low fundamental may have harmonics or onset energy in the communication band |
+
+The [Ministry's source examples](https://www.env.go.jp/content/900405791.pdf) include low-frequency equipment noise, but an equipment name alone does not establish its spectrum.
+Even out-of-band sound can change the communication waveform if the microphone/input circuit overloads or automatic gain/noise suppression responds.
+The tool requests these processing options off and displays reported settings; it cannot control every process inside the equipment.
+
+For comparison, keep the devices, placement, message and output level fixed. Compare a quiet baseline with one type of everyday sound present.
+Check whether the failure occurs at synchronization, length, payload or CRC.
+The graph enlarges only the data band; absence of low-frequency sound or out-of-band markers from that graph does not mean those signals are absent.
+Passing the 1kHz self-check does not establish reception or noise tolerance across the communication band.
+
+### Short versus long tones
+
+A character appearing to be “cut out” does not necessarily mean that sound was physically removed.
+Noise can mask tones, favor a wrong candidate or disrupt synchronization, producing an unknown byte or a wrong byte.
+Japanese characters and emoji use multiple UTF-8 bytes, so losing one byte can prevent a complete character from being displayed.
+
+With 85ms symbols, the 2048-sample analysis window, about 42.7ms at 48kHz, occupies a larger share of each symbol.
+A click or echo of the same duration can therefore consume more of the usable stable interval.
+192ms or 384ms symbols allow more time to average FFT observations near the center, without changing the FFT's frequency resolution.
+Longer tones do not remove persistent in-band interference, high-frequency attenuation or clipping. Longer messages also leave more time for another everyday sound to occur.
+
+## 🧩 From partial reception to error correction
+
+### Exact recovery versus understanding the meaning
+
+Sound arriving, some bytes being read, a whole frame passing verification, and a person understanding the message are different outcomes.
+In the illustrative received text `MEET AT THE STA?ION`, surrounding letters and vocabulary suggest `STATION` as a candidate.
+Grammar, familiar phrases and context provide linguistic redundancy, so a message can remain understandable despite missing characters.
+This relates to language redundancy and noisy communication discussed in [Shannon's paper](https://people.math.harvard.edu/~ctm/home/text/others/shannon/entropy/entropy.pdf).
+
+However, a missing digit in `MEET AT 1?`, a negation, an amount or a proper name can change the meaning.
+A plausible sentence need not be the original sentence. Compressed data and ciphertext also offer little support for human contextual reconstruction.
+**This tool does not implement grammar- or meaning-based candidate reconstruction.** It does not fill “?” automatically or label guessed characters as verified.
+Successful reception requires one frame's payload, CRC, end markers and UTF-8 to pass together. CRC-8 can miss some errors; it is neither a mathematical proof of correctness nor sender authentication.
+
+### Benefits and limits of two full transmissions
+
+When a sudden noise overlaps only one copy, the other copy may arrive intact.
+The tool validates each copy as a separate frame and uses a valid frame when one is available.
+It does not automatically merge partial copies, vote on individual bytes or request retransmission.
+Two disagreeing values alone would not give a simple majority vote a correct answer either.
+
+If each copy has the same whole-message success probability `p` and failures are independent, the probability of at least one success in two copies is `1 − (1 − p)²`.
+This is an explanatory model, not a measured success rate for this tool.
+Persistent interference or attenuation at particular frequencies can damage the same positions in both copies, violating independence.
+Repetition also takes more time. A transmission count alone cannot justify filling in characters when none were received.
+
+### Telegraphy and possible future extensions
+
+Recognizing signals and boundaries in noise, then requesting an uncertain portion again, is also a problem in Morse telegraphy.
+[ITU's International Morse code](https://www.itu.int/rec/R-REC-M.1677-1-200910-I) defines error and repetition-request signals.
+This tool's two copies are scheduled by the sender in advance, unlike retransmission prompted by a receiver request.
+Neither Morse code itself nor human contextual guessing should simply be treated as an error-correcting code.
+
+**Error-correcting codes** add structured redundancy to recover original data within specified error or erasure limits.
+A future error-correction option could improve reception when some bytes cannot be read.
+The following are unimplemented design options, not features added by this documentation change.
+
+| Possible extension | Expected benefit | Requirements and cost |
+|---|---|---|
+| Numbered short blocks | Handle damaged regions separately rather than failing an entire 256-byte message | Requires message identity, ordering, lengths and per-block validation; adds overhead |
+| Reed–Solomon or another error-correcting code | Recover wrong bytes or known-position erasures within the code's capacity | Adds redundancy and computation; length information also needs protection |
+| Interleaving | Spread a burst of damage across multiple correction blocks | Does not correct errors by itself; needs a code, buffering and delay |
+| Combining observations from repeated copies | Potentially use positions read correctly in another copy | Requires matching message/position identities, handling conflicts and validating the reconstructed whole |
+| Acknowledgments and selective retransmission | Resend only failed blocks | Requires a return channel and more time; acknowledgments can also be lost |
+| Language-based candidate display | Help a person infer the message | Must keep observations separate from guesses and cannot guarantee the original bytes |
+
+[ggwave](https://github.com/ggerganov/ggwave#technical-details) is an example of Reed–Solomon in an acoustic modem.
+An extension here would still need to revalidate corrected data and report failure when decoding is declared uncorrectable.
+Payload error correction alone cannot solve missing synchronization or a communication band that never reaches the receiver.
+
+## 📡 Potential for acoustic air-gap communication
+
+Disconnecting a network can still leave a sound path from a speaker to a microphone, allowing data transfer under suitable conditions.
+This tool deliberately exercises that path. It requires the page to be available beforehand, sender operation, an authorized and active microphone at the receiver, matching protocols and an adequate acoustic path.
+It does not install software on an isolated device or obtain permissions for it.
+[Hanspach and Goetz's acoustic communication paper](https://arxiv.org/abs/1406.1213) provides an independent research example; its protocol's results do not establish this tool's range or success rate.
+
+### What has been checked with this tool
+
+On 2026-10-21, an additional physical loopback check sent 256 bytes containing Japanese text and emoji from a FOSTEX PC200USB-HR to a HyperX SoloCast.
+It used Chromium, −30dBFS output and two full transmissions. This was one equipment/placement setup, not a Vivaldi or two-device test.
+
+| Condition | Observation |
+|---|---|
+| Audible, 192ms, 256 bytes | One frame yielded 162 bytes with 94 erasures; whole-frame verification failed |
+| Near-ultrasonic, 192ms, 256 bytes | A start sequence was recognized, but length decoding failed before payload reception |
+| Audible, 384ms, 256 bytes | The approximately 205-second transmission completed, but length decoding and whole-message recovery failed |
+| Control: `HELLO`, audible, 192ms | This trial did not recognize a start sequence and failed to recover the message |
+
+The additional software-only checks recovered all 256 bytes exactly in 24 combinations of different sample rates, both bands, all three durations and one/two copies.
+The physical failure's cause was not identified; these results do not implicate any particular everyday noise listed above.
+Support for processing 256 bytes and reliable transfer through air are evaluated separately.
+
+### Information can survive a failed whole-message check
+
+If correctly read fragments contain part of a message or an identifier, some information can pass even when whole-frame verification fails.
+Context can sometimes preserve meaning in natural language; CRC failure does not establish that no information crossed the channel.
+Unverified fragments can also contain wrong readings, so understanding a message is not equivalent to recovering every byte correctly.
+The observed 162-byte count does not demonstrate that arbitrary messages remain understandable or establish a reliable leakage channel.
+
+Near-ultrasonic sound may be less noticeable to a person, but it does not guarantee silence, secrecy or noise resistance.
+Reducing direct overlap with audible household sounds still leaves equipment response and other high-frequency sounds as constraints.
+Error correction could make better use of signals that arrive, at the cost of net throughput, while leaving limitations of the physical sound path unresolved.
+
+For an isolated environment, relevant controls include unnecessary audio input/output, microphone permissions, nearby devices capable of receiving sound and the acoustic path.
+Everyday noise or this reception failure should not be relied upon as a communication-blocking control.
+The tool supports evaluating what signals or characters arrive under selected conditions, and where that experiment stops succeeding.
+
 ## 🔄 Comparison with other air-gap channels
 
 Distances below are laboratory reports involving particular equipment, line of sight or favorable conditions.
@@ -205,7 +343,7 @@ Maximum rate and maximum distance need not occur together. Countermeasures summa
 
 | Path and method | Rate and receiver | Distance and conditions | Example countermeasures | Source |
 |---|---|---|---|---|
-| Acoustic: this tool | 2.49B/s by default (1.25–11.08B/s across settings), 256 bytes; microphone | Physical range unmeasured | Disable unnecessary audio input/output; control receiving devices | Implementation and calculations above |
+| Acoustic: this tool | 2.49B/s by default (1.25–11.08B/s across settings), 256 bytes; microphone | Range not measured; the three physical conditions above failed to recover all 256 bytes | Disable unnecessary audio input/output; control receiving devices | Implementation, calculations and physical check above |
 | Optical: LED-it-GO | Up to 4000bit/s with a photodiode; 15–120bit/s with cameras | Optical sensor: 3–5m indoors; signals observed at 20m outdoors at night; camera example at 8m | Cover LEDs; restrict cameras | [Author paper](https://arxiv.org/pdf/1702.06715), Table 7 and distance section |
 | Magnetic: MAGNETO | 0.2–5bit/s; smartphone magnetometer | 0–12cm, desktop PCs | Control nearby devices; increase separation | [Author paper](https://arxiv.org/pdf/1802.02317), Table 1 |
 | Magnetic: ODINI | 40bit/s; dedicated magnetic sensor | 100–150cm | Restrict receivers; address magnetic emissions | [Via MAGNETO Table 1](https://arxiv.org/pdf/1802.02317); original paper not directly verified |
