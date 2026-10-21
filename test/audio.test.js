@@ -21,6 +21,7 @@ function setup(options = {}) {
       this.state = 'suspended';
       this.destination = { kind: 'destination' };
       this.outputLatency = 0.02;
+      this.analysers = [];
       contexts.push(this);
     }
     get currentTime() { return options.frozen ? 0 : now / 1000; }
@@ -29,8 +30,9 @@ function setup(options = {}) {
     createAnalyser() {
       const node = { kind: 'analyser', frequencyBinCount: 1024, targets: [],
         connect(target) { this.targets.push(target); }, disconnect() { this.disconnected = true; },
-        getFloatFrequencyData(values) { reads++; values.fill(-120); if (options.spectrum) options.spectrum(values, now); } };
-      this.analyser = node;
+        getFloatFrequencyData(values) { reads++; values.fill(-120); if (options.spectrum) options.spectrum(values, now, this); } };
+      this.analysers.push(node);
+      if (!this.analyser) this.analyser = node;
       return node;
     }
     createMediaStreamSource(received) {
@@ -107,7 +109,16 @@ for (const role of ['send', 'receive', 'loopback']) {
       assert.equal(f.contexts[0].input.targets[0], f.contexts[0].analyser);
       assert.equal(f.contexts[0].analyser.targets.length, 0);
     } else assert.equal(f.contexts[0].analyser.targets[0], f.contexts[0].destination);
+    if (role === 'loopback') {
+      assert.equal(f.contexts[0].analysers.length, 2);
+      const [receive, transmit] = f.contexts[0].analysers;
+      assert.notEqual(receive, transmit);
+      assert.deepEqual(transmit.targets, [f.contexts[0].destination]);
+      assert.equal(transmit.fftSize, 2048);
+      assert.equal(transmit.smoothingTimeConstant, 0);
+    }
     await f.audio.close();
+    assert.ok(f.contexts[0].analysers.every(node => node.disconnected));
     assert.equal(f.contexts[0].state, 'closed');
     assert.equal(f.metrics().stoppedTracks, microphone ? 1 : 0);
   });
@@ -205,6 +216,30 @@ test('Audio: failed physical loopback self-check prevents transmission', async (
   assert.equal(f.sources.length, 1);
   assert.equal(f.sources[0].targets[0], f.contexts[0].destination);
   assert.equal(f.sources[0].buffer.count, 12000);
+  await f.audio.close();
+});
+
+test('Audio: loopback emits separate synchronous spectra and never decodes the outgoing graph as microphone data', async () => {
+  const events = [], cfg = core.config('reliable', 48000);
+  const f = setup({ spectrum(values, now, node) {
+    if (now > 200 && now < 400) values[core.frequencyBin(1000, 48000)] = -30;
+    if (now > 500 && node === f.contexts[0].analysers[1]) {
+      for (const frequency of core.byteTones(65, cfg)) values[core.frequencyBin(frequency, 48000)] = -30;
+    }
+  } });
+  await f.audio.open('loopback');
+  await assert.rejects(f.audio.run('loopback', 'A', 'reliable', -30, event => {
+    events.push(event);
+    if (event.type === 'spectrum' && event.side === 'receive') f.audio.stop();
+  }), /cancelled/);
+  const spectra = events.filter(event => event.type === 'spectrum');
+  assert.deepEqual(spectra.map(event => event.side), ['transmit', 'receive']);
+  assert.equal(spectra[0].time, spectra[1].time);
+  assert.equal(spectra[0].decision.value, 65);
+  assert.equal(spectra[1].decision.value, null);
+  assert.equal(events.some(event => ['byte', 'frame'].includes(event.type)), false);
+  assert.equal(f.sources[1].targets[0], f.contexts[0].analysers[1]);
+  assert.ok(f.contexts[0].analysers.every(node => node.disconnected));
   await f.audio.close();
 });
 

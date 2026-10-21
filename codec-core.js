@@ -14,9 +14,10 @@
   // Physical frequencies are shared across devices, not derived from the receiver rate.
   // Verified using native offline rendering at 44.1/48 kHz, including resampling.
   const MODES = Object.freeze({
-    reliable: Object.freeze({ f0: 1500, spacing: 94, symbol: 0.192, repeats: 2 }),
-    ultrasonic: Object.freeze({ f0: 16000, spacing: 94, symbol: 0.085, repeats: 1 })
+    reliable: Object.freeze({ f0: 1500, spacing: 94 }),
+    ultrasonic: Object.freeze({ f0: 16000, spacing: 94 })
   });
+  const TIMINGS = Object.freeze({ short: 0.085, long: 0.192 });
   const PREAMBLE = Object.freeze([0, 1, 0, 1]);
   const END = Object.freeze([0, 1]);
 
@@ -25,15 +26,19 @@
     return rate;
   }
 
-  function config(mode, rate) {
+  function config(mode, rate, options = {}) {
     const preset = MODES[mode];
-    if (!preset) throw new RangeError('invalidMode');
+    if (!Object.hasOwn(MODES, mode)) throw new RangeError('invalidMode');
+    const timing = options.timing === undefined ? 'short' : options.timing;
+    const repeats = options.repeats === undefined ? 2 : options.repeats;
+    if (!Object.hasOwn(TIMINGS, timing) || ![1, 2].includes(repeats)) throw new RangeError('invalidSettings');
+    const symbol = TIMINGS[timing];
     rateValue(rate);
     const tones = Array.from({ length: 32 }, (_, i) => preset.f0 + i * preset.spacing);
     const markers = [preset.f0 - 2 * preset.spacing, preset.f0 - preset.spacing];
     const upper = 0.45 * rate;
-    return { ...preset, mode, rate, tones, markers, upper,
-      supported: tones[31] <= upper && FFT_SIZE / rate + 0.014 < preset.symbol };
+    return { ...preset, mode, rate, tones, markers, upper, timing, symbol, repeats,
+      supported: tones[31] <= upper && FFT_SIZE / rate + 0.014 < symbol };
   }
 
   function bytesOf(text) {
@@ -238,9 +243,9 @@
     return total === 0 ? 100 : 100 * a.filter((character, i) => character === b[i]).length / total;
   }
 
-  function duration(length, mode) {
+  function duration(length, mode, options = {}) {
     if (!Number.isInteger(length) || length < 0 || length > MAX_BYTES || !MODES[mode]) throw new RangeError('invalidLength');
-    const { symbol, repeats } = MODES[mode];
+    const { symbol, repeats } = config(mode, 48000, options);
     return 0.5 + (length + 8) * symbol * repeats + (repeats - 1) * 0.25;
   }
 
@@ -371,7 +376,7 @@
     return { samples, rate, channels };
   }
 
-  return Object.freeze({ FFT_SIZE, MAX_BYTES, MAX_DB, RECEIVE_POWER_FLOOR, CONFIDENCE_DB, MODES, PREAMBLE, END,
+  return Object.freeze({ FFT_SIZE, MAX_BYTES, MAX_DB, RECEIVE_POWER_FLOOR, CONFIDENCE_DB, MODES, TIMINGS, PREAMBLE, END,
     config, bytesOf, textOf, partialText, crc8, byteTones, frame, frequencyBin, bandPower, deltaDb,
     classifyPowers, demodulate, createDecoder, matchRate, duration, processing, gain, toneSamples, transmission,
     MAX_WAV_BYTES, spectrumOf, decodeWav });

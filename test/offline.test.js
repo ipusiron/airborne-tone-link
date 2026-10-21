@@ -77,8 +77,9 @@ test('Offline: malformed, oversized, non-PCM and non-finite WAVs are rejected', 
 
 for (const rate of [44100, 48000]) {
   for (const mode of ['reliable', 'ultrasonic']) {
-    test(`Offline: ${mode} ${rate} Hz actual PCM produces HELLO and completed CRC`, () => {
-      const cfg = c.config(mode, rate), wave = c.transmission('HELLO', cfg, -30);
+    for (const timing of ['short', 'long']) for (const repeats of [1, 2]) {
+    test(`Offline: ${mode} ${rate} Hz ${timing} x${repeats} PCM restores HELLO and CRC`, () => {
+      const cfg = c.config(mode, rate, { timing, repeats }), wave = c.transmission('HELLO', cfg, -30);
       const { samples } = c.decodeWav(wav(wave.samples, rate));
       const decoder = c.createDecoder(cfg), frames = [], partial = [];
       for (let offset = 0; offset + c.FFT_SIZE <= samples.length; offset += Math.round(rate * 0.008)) {
@@ -92,6 +93,7 @@ for (const rate of [44100, 48000]) {
       assert.ok(frames.every(frame => frame.valid && frame.text === 'HELLO'));
       assert.ok(partial.includes('H') && partial.includes('HELL'));
     });
+    }
   }
 }
 

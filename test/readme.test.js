@@ -40,7 +40,7 @@ test('README: both speed tables recalculate from the protocol, including framing
   documents.forEach((text, language) => {
     const values = labels[language].map(label => cells(text, label));
     for (const [i, mode] of ['reliable', 'ultrasonic'].entries()) {
-      const preset = core.MODES[mode], duration = core.duration(16, mode);
+      const preset = core.config(mode, 48000), duration = core.duration(16, mode);
       const expected = [preset.f0, preset.symbol * 1000, preset.repeats,
         (1 / (preset.symbol * preset.repeats)).toFixed(2), duration.toFixed(3), (16 / duration).toFixed(2)];
       expected.forEach((number, row) => {
@@ -51,8 +51,18 @@ test('README: both speed tables recalculate from the protocol, including framing
     }
   });
   const html = read('index.html');
-  for (const value of ['9.966s', '2.540s', '1.61B/s', '6.30B/s', '2.60B/s', '11.76B/s']) {
-    assert.equal(html.split(`>${value}<`).length - 1, 1, value);
+  for (const metric of ['symbol', 'repeats', 'nominal', 'duration', 'net']) {
+    assert.equal(html.split(`data-metric="${metric}"`).length - 1, 2, metric);
+  }
+});
+test('README: the four common timing/count settings have explicit reference rates in both languages', () => {
+  const expected = [
+    ['11.76B/s', '2.540s', '6.30B/s'], ['5.88B/s', '4.830s', '3.31B/s'],
+    ['5.21B/s', '5.108s', '3.13B/s'], ['2.60B/s', '9.966s', '1.61B/s']
+  ];
+  for (const text of documents) {
+    for (const row of expected) assert.ok(text.includes('| ' + row.join(' | ') + ' |'));
+    assert.ok(text.includes('2.960'));
   }
 });
 test('README: byte, tone, duration and CRC examples have known values', () => {

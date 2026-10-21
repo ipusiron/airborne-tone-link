@@ -40,6 +40,17 @@
         </div>
       </fieldset>
       <p class="muted" data-i18n="modeNote"></p>
+      <div class="settings-grid">
+        <div class="field">
+          <label for="timing" data-i18n="timing"></label>
+          <select id="timing"><option value="short" data-i18n="shortTone" selected></option><option value="long" data-i18n="longTone"></option></select>
+        </div>
+        <div class="field">
+          <label for="repeat-count" data-i18n="repeatCount"></label>
+          <select id="repeat-count"><option value="1" data-i18n="once"></option><option value="2" data-i18n="twice" selected></option></select>
+        </div>
+      </div>
+      <p class="muted" data-i18n="settingsNote"></p>
     </section>
     <section class="card" aria-labelledby="environment-title">
       <h2 id="environment-title"><span class="number">02</span> <span data-i18n="environment"></span></h2>
@@ -60,7 +71,7 @@
       <select id="role">
         <option value="send" data-i18n="send"></option>
         <option value="receive" data-i18n="receive"></option>
-        <option value="loopback" data-i18n="loopback"></option>
+        <option value="loopback" data-i18n="loopback" selected></option>
         <option value="offline" data-i18n="offline"></option>
       </select>
       <p class="muted" data-i18n="roleNote"></p>
@@ -88,12 +99,22 @@
     </section>
     <section class="card" aria-labelledby="plot-title">
       <h2 id="plot-title"><span class="number">04</span> <span data-i18n="visualization"></span></h2>
+      <p id="comparison-settings" class="mono"></p>
+      <p class="muted" data-i18n="comparisonNote"></p>
+      <h3 data-i18n="transmitPlot"></h3>
+      <p id="transmit-source" class="muted"></p>
+      <div class="plot-wrap">
+        <canvas id="transmit-spectrogram" width="960" height="210" role="img" data-label="transmitPlotLabel"></canvas>
+      </div>
+      <p id="transmit-tone-pair" class="mono tone-pair"></p>
+      <h3 data-i18n="receivePlot"></h3>
+      <p id="receive-source" class="muted"></p>
       <div class="plot-wrap">
         <canvas id="spectrogram" width="960" height="320" role="img" data-label="plotLabel"></canvas>
       </div>
       <p class="muted" data-i18n="plotNote"></p>
       <div class="plot-legend"><span>−100dB</span><span class="ramp" aria-hidden="true"></span><span>−20dB</span></div>
-      <p id="tone-pair" class="mono"></p>
+      <p id="tone-pair" class="mono tone-pair"></p>
       <p class="muted" data-i18n="plotUnits"></p>
       <h3 data-i18n="live"></h3>
       <p id="live-source" class="muted"></p>
@@ -120,11 +141,11 @@
           <thead><tr><th scope="col" data-i18n="metric"></th><th scope="col" data-i18n="reliable"></th><th scope="col" data-i18n="ultrasonic"></th></tr></thead>
           <tbody>
             <tr><th scope="row" data-i18n="dataBand"></th><td>1,500–4,414Hz</td><td>16,000–18,914Hz</td></tr>
-            <tr><th scope="row" data-i18n="symbolLength"></th><td>192ms</td><td>85ms</td></tr>
-            <tr><th scope="row" data-i18n="repeats"></th><td>2</td><td>1</td></tr>
-            <tr><th scope="row" data-i18n="nominalRate"></th><td>2.60B/s</td><td>11.76B/s</td></tr>
-            <tr><th scope="row" data-i18n="fullDuration"></th><td>9.966s</td><td>2.540s</td></tr>
-            <tr><th scope="row" data-i18n="netRate"></th><td>1.61B/s</td><td>6.30B/s</td></tr>
+            <tr><th scope="row" data-i18n="symbolLength"></th><td data-metric="symbol"></td><td data-metric="symbol"></td></tr>
+            <tr><th scope="row" data-i18n="repeats"></th><td data-metric="repeats"></td><td data-metric="repeats"></td></tr>
+            <tr><th scope="row" data-i18n="nominalRate"></th><td data-metric="nominal"></td><td data-metric="nominal"></td></tr>
+            <tr><th scope="row" data-i18n="fullDuration"></th><td data-metric="duration"></td><td data-metric="duration"></td></tr>
+            <tr><th scope="row" data-i18n="netRate"></th><td data-metric="net"></td><td data-metric="net"></td></tr>
           </tbody>
         </table>
       </div>
