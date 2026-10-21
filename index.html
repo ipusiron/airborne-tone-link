@@ -64,7 +64,11 @@
             <label for="timing" data-i18n="timing"></label>
             <button id="timing-help" class="icon-button" type="button" data-label="timingHelp" aria-haspopup="dialog" aria-controls="timing-dialog"><span aria-hidden="true">?</span></button>
           </div>
-          <select id="timing"><option value="short" data-i18n="shortTone" selected></option><option value="long" data-i18n="longTone"></option></select>
+          <select id="timing">
+            <option value="short" data-i18n="shortTone"></option>
+            <option value="long" data-i18n="longTone" selected></option>
+            <option value="longer" data-i18n="longerTone"></option>
+          </select>
         </div>
         <div class="field">
           <div class="field-label">
@@ -267,6 +271,7 @@
     <ul class="setting-help-list">
       <li data-i18n="timingHelpShort"></li>
       <li data-i18n="timingHelpLong"></li>
+      <li data-i18n="timingHelpLonger"></li>
     </ul>
     <p id="timing-help-current" class="mono"></p>
     <button id="timing-help-close" type="button" data-i18n="close" autofocus></button>

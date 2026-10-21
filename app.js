@@ -145,7 +145,8 @@
     document.querySelectorAll('[data-metric]').forEach(node => { node.textContent = values[node.dataset.metric]; });
     const count = ['send', 'loopback'].includes($('role').value) ? `${t('repeatCount')}: ${cfg.repeats}` : t('countNotMeasured');
     $('comparison-settings').textContent = `${t(mode)} / ${t('timing')}: ${cfg.symbol * 1000}ms / ${count}`;
-    $('timing-help-current').textContent = `${t('currentSelection')}: ${t(cfg.timing === 'short' ? 'shortTone' : 'longTone')}`;
+    const timingLabel = { short: 'shortTone', long: 'longTone', longer: 'longerTone' }[cfg.timing];
+    $('timing-help-current').textContent = `${t('currentSelection')}: ${t(timingLabel)}`;
     $('repeat-help-current').textContent = `${t('currentSelection')}: ${t(cfg.repeats === 1 ? 'once' : 'twice')}`;
   }
 

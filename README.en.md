@@ -44,7 +44,7 @@ The four Japanese views appear in the [Japanese README](README.md).
 ## ✨ Features
 
 - Split one byte into two 4-bit groups; select one tone from each of two separate 16-tone blocks
-- Audible and Ultrasonic bands with independent common settings: 85/192ms tones and 1/2 full transmissions
+- Audible and Ultrasonic bands with independent common settings: 85/192/384ms tones and 1/2 full transmissions
 - Send only, receive only, physical loopback and local WAV decoding
 - A spectrogram focused on 32 data tones, with incremental UTF-8 decoding
 - CRC-8, confidence and character agreement for loopback
@@ -65,7 +65,7 @@ Reported names do not identify microphones or speakers connected beyond an audio
 5. To try near-ultrasound, switch both devices to Ultrasonic.
 
 `HELLO` is 5 bytes, `日本語` is 9 bytes and `😀😀😀😀` is 16 bytes.
-Defaults are Audible, Short (85ms), and two full transmissions. Changing bands preserves duration and count. Some people can hear frequencies near 16kHz.
+Defaults are Audible, Long (192ms), and two full transmissions. Changing bands preserves duration and count. Some people can hear frequencies near 16kHz.
 Avoid simultaneous transmitters. There is no automatic reply or retransmission request; switch roles to reverse the direction.
 
 ### Loop back on one device
@@ -99,7 +99,7 @@ If text recovery fails, check Reception diagnostics. It shows data tone detectio
 
 The default Loopback role shows the outgoing waveform above and microphone input below. Separate analyzers measure the two paths on the same time, frequency and color scales. The output is never wired directly into the receiver. The upper plot measures the digital waveform passed to the speaker, not sound emitted into the air. Their difference is not a calibrated attenuation measurement.
 
-To compare frequency bands, keep duration, count, message, volume and device positions equal. With Short tones and two transmissions, `HELLO` takes 2.960 seconds in either band. Reception delays also appear on the shared time axis.
+To compare frequency bands, keep duration, count, message, volume and device positions equal. With default Long tones and two transmissions, `HELLO` takes 5.742 seconds in either band. Reception delays also appear on the shared time axis.
 
 Send only measures the upper plot; Receive only measures the lower plot. Check the transmitting device for its own outgoing waveform. WAV data appears below. Select the duration used by the sender when receiving or decoding WAVs. Older audible WAVs use Long (192ms). The count is a sender setting; Receive only stops at the first valid frame.
 
@@ -112,7 +112,7 @@ Send only measures the upper plot; Receive only measures the lower plot. Check t
 | Does character count equal communication size? | `HELLO` has 5 characters and 5 bytes; `日本語` has 3 characters and 9 bytes. Compare their transmission times |
 | What happens when a character repeats? | `AAAA` repeats 1,876Hz and 3,098Hz. A synchronized clock still reads four separate bytes |
 | Which missing tone prevents decoding? | Change device direction or distance and inspect both blocks. One block alone leaves four bits unknown, producing “?” |
-| What does a speed figure count? | With defaults, either band takes 4.830 seconds for 16 bytes, or 3.31B/s net. Compare with 5.88B/s excluding framing |
+| What does a speed figure count? | With defaults, either band takes 9.966 seconds for 16 bytes, or 1.61B/s net. Compare with 2.60B/s excluding framing |
 | Is communication the same as secrecy? | Decode a public message with another receiver. CRC success does not imply encryption or sender authentication |
 
 In a class or exhibit, explain the mechanism in audible mode before moving to near-ultrasound.
@@ -151,30 +151,33 @@ Receive only, WAV decoding and Send only do not display agreement because they l
 
 We checked 72 conditions in Chromium and Firefox at 44.1/48kHz.
 Eight amplitude checks covered 34 frequencies with an independent sine/cosine least-squares fit; the maximum deviation from −30dBFS was below 0.000001dB.
-Sixty-four decoding checks combined 44.1/48kHz transmit and receive rates, both bands, both durations and both counts, using native resampling and an independent FFT to recover `HELLO日本語` and its CRC.
-These measurements support F0=1,500/16,000Hz, 94Hz spacing and common 85/192ms symbols with 1/2 transmissions.
+Sixty-four decoding checks combined 44.1/48kHz transmit and receive rates, both bands, 85/192ms durations and both counts, using native resampling and an independent FFT to recover `HELLO日本語` and its CRC.
+An additional 32 decoding checks confirmed 384ms tones with the same transmit/receive rates, both bands and 1/2 transmissions.
+These measurements support F0=1,500/16,000Hz, 94Hz spacing and common 85/192/384ms symbols with 1/2 transmissions.
 They validate software waveforms, not physical high-frequency response or transmission distance.
 
 ## ⏱️ Transfer-rate limits
 
-Comparison with default Short (85ms) tones and two full transmissions. Frequency band and timing are independent.
+Comparison with default Long (192ms) tones and two full transmissions. Frequency band and timing are independent.
 
 | Item | Audible | Ultrasonic (advanced) |
 |---|---:|---:|
 | F0 | 1,500Hz | 16,000Hz |
 | Data band | 1,500–4,414Hz | 16,000–18,914Hz |
-| Symbol duration | 85ms | 85ms |
+| Symbol duration | 192ms | 192ms |
 | Full transmissions | 2 | 2 |
-| With repeats, without framing | 5.88B/s | 5.88B/s |
-| Time for 16 bytes | 4.830s | 4.830s |
-| Net rate for 16 bytes | 3.31B/s | 3.31B/s |
+| With repeats, without framing | 2.60B/s | 2.60B/s |
+| Time for 16 bytes | 9.966s | 9.966s |
+| Net rate for 16 bytes | 1.61B/s | 1.61B/s |
 
 | Common settings | With repeats, without framing | Time for 16 bytes | Net rate for 16 bytes |
 |---|---:|---:|---:|
 | Short 85ms, once | 11.76B/s | 2.540s | 6.30B/s |
-| Short 85ms, twice (default) | 5.88B/s | 4.830s | 3.31B/s |
+| Short 85ms, twice | 5.88B/s | 4.830s | 3.31B/s |
 | Long 192ms, once | 5.21B/s | 5.108s | 3.13B/s |
-| Long 192ms, twice | 2.60B/s | 9.966s | 1.61B/s |
+| Long 192ms, twice (default) | 2.60B/s | 9.966s | 1.61B/s |
+| Extra long 384ms, once | 2.60B/s | 9.716s | 1.65B/s |
+| Extra long 384ms, twice | 1.30B/s | 19.182s | 0.83B/s |
 
 B means bytes. The rate including repeats but excluding framing is `1 / (symbol duration × transmission count)`.
 For payload length L, symbol duration T and transmission count R, waveform duration is `0.5 + (L + 8) × T × R + 0.25 × (R − 1)` seconds.
@@ -198,7 +201,7 @@ Maximum rate and maximum distance need not occur together. Countermeasures summa
 
 | Path and method | Rate and receiver | Distance and conditions | Example countermeasures | Source |
 |---|---|---|---|---|
-| Acoustic: this tool | 3.31B/s by default (1.61–6.30B/s across settings), 16 bytes; microphone | Physical range unmeasured | Disable unnecessary audio input/output; control receiving devices | Implementation and calculations above |
+| Acoustic: this tool | 1.61B/s by default (0.83–6.30B/s across settings), 16 bytes; microphone | Physical range unmeasured | Disable unnecessary audio input/output; control receiving devices | Implementation and calculations above |
 | Optical: LED-it-GO | Up to 4000bit/s with a photodiode; 15–120bit/s with cameras | Optical sensor: 3–5m indoors; signals observed at 20m outdoors at night; camera example at 8m | Cover LEDs; restrict cameras | [Author paper](https://arxiv.org/pdf/1702.06715), Table 7 and distance section |
 | Magnetic: MAGNETO | 0.2–5bit/s; smartphone magnetometer | 0–12cm, desktop PCs | Control nearby devices; increase separation | [Author paper](https://arxiv.org/pdf/1802.02317), Table 1 |
 | Magnetic: ODINI | 40bit/s; dedicated magnetic sensor | 100–150cm | Restrict receivers; address magnetic emissions | [Via MAGNETO Table 1](https://arxiv.org/pdf/1802.02317); original paper not directly verified |

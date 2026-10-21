@@ -17,7 +17,7 @@
     reliable: Object.freeze({ f0: 1500, spacing: 94 }),
     ultrasonic: Object.freeze({ f0: 16000, spacing: 94 })
   });
-  const TIMINGS = Object.freeze({ short: 0.085, long: 0.192 });
+  const TIMINGS = Object.freeze({ short: 0.085, long: 0.192, longer: 0.384 });
   const PREAMBLE = Object.freeze([0, 1, 0, 1]);
   const END = Object.freeze([0, 1]);
 
@@ -29,7 +29,7 @@
   function config(mode, rate, options = {}) {
     const preset = MODES[mode];
     if (!Object.hasOwn(MODES, mode)) throw new RangeError('invalidMode');
-    const timing = options.timing === undefined ? 'short' : options.timing;
+    const timing = options.timing === undefined ? 'long' : options.timing;
     const repeats = options.repeats === undefined ? 2 : options.repeats;
     if (!Object.hasOwn(TIMINGS, timing) || ![1, 2].includes(repeats)) throw new RangeError('invalidSettings');
     const symbol = TIMINGS[timing];

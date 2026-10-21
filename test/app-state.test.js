@@ -22,7 +22,7 @@ function app(run, plot = null) {
   nodes.role.value = 'loopback';
   nodes['text-input'].value = 'SECRET';
   nodes.gain.value = '-30';
-  nodes.timing.value = 'short';
+  nodes.timing.value = 'long';
   nodes['repeat-count'].value = '2';
   for (const id of ['spectrogram', 'transmit-spectrogram']) {
     nodes[id].getContext = () => plot && plot.pen;
@@ -193,14 +193,14 @@ test('UI: changing band preserves common timing and count and forwards them to a
     return frame([0x41], 'A', true);
   });
   await view.start();
-  view.changeTiming('long');
+  view.changeTiming('short');
   view.changeRepeats(1);
   view.changeMode();
-  assert.equal(view.nodes.timing.value, 'long');
+  assert.equal(view.nodes.timing.value, 'short');
   assert.equal(view.nodes['repeat-count'].value, '1');
   await view.start();
-  assert.deepEqual(seen, [{ mode: 'reliable', timing: 'short', repeats: 2 },
-    { mode: 'ultrasonic', timing: 'long', repeats: 1 }]);
+  assert.deepEqual(seen, [{ mode: 'reliable', timing: 'long', repeats: 2 },
+    { mode: 'ultrasonic', timing: 'short', repeats: 1 }]);
   view.changeRole('receive');
   assert.equal(view.nodes['repeat-count'].disabled, true);
   assert.equal(view.nodes['transmit-source'].textContent, messages.en.noTransmitSource);
