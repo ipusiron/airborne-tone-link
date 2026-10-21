@@ -37,6 +37,7 @@ function app(run, plot = null) {
   };
   const audio = {
     open: async () => ({ sampleRate: 48000, processing: {} }),
+    devices: async () => ({ microphone: null, microphoneActive: true, speaker: null }),
     run, close: async () => {}, onInterrupted() {}
   };
   const window = { AirborneCodec: core, AirborneMessages: messages, listeners: {},
@@ -66,6 +67,44 @@ test('UI: no input events never copies send text into recovered text', async () 
   assert.equal(view.nodes['live-state'].textContent, messages.en.liveEmpty);
   assert.equal(view.nodes['result-content'].hidden, true);
   assert.equal(view.nodes['live-source'].textContent, messages.en.sourceMic);
+});
+
+const diagnostic = values => ({ windows: 100, dataWindows: 0, markerMask: 0, syncs: 0, headers: 0, lengthErrors: 0,
+  maxReadable: 0, readableLength: 0, frames: 0, validFrames: 0, crcFailures: 0, endFailures: 0, utf8Failures: 0,
+  maxGap: 0.008, ...values });
+for (const [values, key] of [
+  [{}, 'diagnosticNoTone'],
+  [{ dataWindows: 20, markerMask: 3 }, 'diagnosticNoSync'],
+  [{ dataWindows: 20, markerMask: 3, syncs: 2, lengthErrors: 2 }, 'diagnosticNoHeader'],
+  [{ syncs: 1, headers: 1, readableLength: 5 }, 'diagnosticNoBody'],
+  [{ syncs: 1, headers: 1, readableLength: 5, maxReadable: 2 }, 'diagnosticIncomplete'],
+  [{ frames: 1, crcFailures: 1 }, 'diagnosticInvalid']
+]) {
+  test(`UI diagnostics: ${key} survives the final generic failure without inventing text`, async () => {
+    const view = app(async (_r, _t, _m, _d, emit) => {
+      emit({ type: 'diagnostics', value: diagnostic(values) });
+      throw Error('noFrame');
+    });
+    await view.start();
+    assert.equal(view.nodes['diagnostic-summary'].textContent, messages.en[key]);
+    assert.equal(view.nodes['live-text'].textContent, messages.en.noRecoveredText);
+    view.changeMode();
+    assert.equal(view.nodes['diagnostic-summary'].textContent, messages.en.diagnosticWaiting);
+    assert.equal(view.nodes['diagnostic-details'].textContent, '');
+  });
+}
+
+test('UI diagnostics: sender observations are hidden and cannot be presented as receiver success', async () => {
+  const view = app(async (_r, _t, _m, _d, emit) => {
+    emit({ type: 'diagnostics', value: diagnostic({ frames: 1, validFrames: 1 }) });
+    return frame([65], 'A', true);
+  });
+  view.changeRole('send');
+  await view.start();
+  assert.equal(view.nodes['receive-diagnostics'].hidden, true);
+  view.changeRole('receive');
+  assert.equal(view.nodes['receive-diagnostics'].hidden, false);
+  assert.equal(view.nodes['diagnostic-summary'].textContent, messages.en.diagnosticWaiting);
 });
 
 test('UI: only unreadable payload slots do not appear as recovered question marks', async () => {

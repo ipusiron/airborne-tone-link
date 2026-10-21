@@ -45,6 +45,23 @@ test('Offline: FFT agrees with an independent direct DFT at selected bins', () =
   assert.throws(() => c.spectrumOf(samples, 1), /invalidWindow/);
 });
 
+test('Offline diagnostics: delayed sound can leave visible data but prevent reading the length', async () => {
+  const cfg = c.config('reliable', 48000, { timing: 'long', repeats: 2 });
+  const tx = c.transmission('HELLO', cfg, -30).samples, delay = 4608;
+  const samples = Float32Array.from(tx, (value, i) => 0.25 * (value + 0.7 * (tx[i - delay] || 0)));
+  const buffer = wav(samples), events = [], io = audio.create();
+  await assert.rejects(io.offline({ size: buffer.byteLength, arrayBuffer: async () => buffer }, 'reliable',
+    event => events.push(event), { timing: 'long', repeats: 2 }), /noFrame/);
+  const d = events.filter(e => e.type === 'diagnostics').at(-1).value;
+  assert.ok(d.dataWindows > 100);
+  assert.equal(d.syncs, 2);
+  assert.equal(d.lengthErrors, 2);
+  assert.equal(d.headers, 0);
+  assert.equal(d.maxReadable, 0);
+  assert.equal(d.validFrames, 0);
+  await io.close();
+});
+
 for (const [bits, code] of [[16, 1], [24, 1], [32, 1], [32, 3]]) {
   test(`Offline: WAV ${bits}-bit format ${code} decodes mono and stereo PCM without altering the file`, () => {
     const samples = Float32Array.from({ length: 2048 }, (_, i) => [-0.5, 0, 0.5][i % 3]);

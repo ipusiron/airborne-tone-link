@@ -161,6 +161,8 @@
     const gate = Math.min(period * 0.18, (period - FFT_SIZE / settings.rate) / 2 - 0.007);
     let history = [], markerValue = null, lastMarkerTime = -Infinity, previousTime = -Infinity;
     let start = null, slot = 0, samples = [], length = null, body = [], confidences = [], endings = [];
+    const diagnostics = { windows: 0, dataWindows: 0, markerMask: 0, syncs: 0, headers: 0, lengthErrors: 0,
+      maxReadable: 0, readableLength: 0, frames: 0, validFrames: 0, crcFailures: 0, endFailures: 0, utf8Failures: 0, maxGap: 0 };
 
     function reset() {
       history = [];
@@ -179,15 +181,23 @@
       samples = [];
       if (slot === 0) {
         if (decision.kind !== 'data' || decision.value === null || decision.value > MAX_BYTES) {
+          diagnostics.lengthErrors++;
           events.push({ type: 'error', reason: 'invalidLength' });
           reset();
           return;
         }
         length = decision.value;
+        diagnostics.headers++;
+        if (!diagnostics.maxReadable) diagnostics.readableLength = length;
         body.push(length);
       } else if (slot <= length + 1) {
         body.push(decision.kind === 'data' ? decision.value : null);
         if (slot <= length) {
+          const readable = body.slice(1).filter(validByte).length;
+          if (readable >= diagnostics.maxReadable) {
+            diagnostics.maxReadable = readable;
+            diagnostics.readableLength = length;
+          }
           confidences.push(decision.confidence);
           events.push({ type: 'byte', bytes: body.slice(1), confidences: [...confidences],
             text: partialText(body.slice(1)), index: slot - 1 });
@@ -198,6 +208,11 @@
           const payload = body.slice(1, -1), decoded = textOf(payload);
           const crcOk = body.every(validByte) && crc8(body.slice(0, -1)) === body.at(-1);
           const endOk = endings.every((value, i) => value === END[i]);
+          diagnostics.frames++;
+          if (crcOk && endOk && decoded.valid) diagnostics.validFrames++;
+          if (!crcOk) diagnostics.crcFailures++;
+          if (!endOk) diagnostics.endFailures++;
+          if (!decoded.valid) diagnostics.utf8Failures++;
           events.push({ type: 'frame', bytes: payload, text: decoded.text, confidences: [...confidences],
             crcOk, endOk, utf8Ok: decoded.valid, valid: crcOk && endOk && decoded.valid });
           reset();
@@ -209,7 +224,11 @@
 
     function push(time, decision) {
       if (!Number.isFinite(time) || time <= previousTime) throw new RangeError('nonIncreasingTime');
+      if (Number.isFinite(previousTime)) diagnostics.maxGap = Math.max(diagnostics.maxGap, time - previousTime);
       previousTime = time;
+      diagnostics.windows++;
+      if (decision.kind === 'marker') diagnostics.markerMask |= 1 << decision.value;
+      else if (decision.value !== null) diagnostics.dataWindows++;
       const events = [];
       if (start !== null) {
         while (start !== null && time > start + (slot + 0.5) * period + gate) finishSlot(events);
@@ -230,10 +249,11 @@
       // keep the protocol period fixed so polling jitter cannot accumulate as drift.
       if (![2, 3].every(i => Math.abs(history[i].time - history[i - 1].time - period) <= period * 0.25)) return events;
       start = history.slice(1).reduce((sum, entry, i) => sum + entry.time - (i + 1) * period, 0) / 3 + 4 * period;
+      diagnostics.syncs++;
       events.push({ type: 'sync' });
       return events;
     }
-    return { push, reset, state: () => ({ synchronized: start !== null, slot, length }) };
+    return { push, reset, state: () => ({ synchronized: start !== null, slot, length }), diagnostics: () => ({ ...diagnostics }) };
   }
 
   function matchRate(expected, actual, role) {
