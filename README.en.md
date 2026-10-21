@@ -336,6 +336,45 @@ For an isolated environment, relevant controls include unnecessary audio input/o
 Everyday noise or this reception failure should not be relied upon as a communication-blocking control.
 The tool supports evaluating what signals or characters arrive under selected conditions, and where that experiment stops succeeding.
 
+### Combining acoustic and LED channels
+
+Sending the same data over paths with different properties, such as audible/near-ultrasonic sound and a blinking LED, could let one path supply parts missed by the other.
+This is a form of diversity: using different paths to increase reception opportunities.
+Sound is constrained by noise, echoes and equipment frequency response; light by obstructions, ambient illumination and sensor or camera characteristics.
+Complementary reception is plausible when the paths fail in different places, but combining them does not by itself guarantee reliability.
+
+One option is to send the whole message over both paths and accept a copy that passes verification.
+A further design could divide the same payload into numbered blocks and send each block over both paths, allowing the following combination.
+The table is a **hypothetical protocol with per-block verification**, not an implementation or measurement of this tool.
+
+| Receiving path or operation | Block 1 | Block 2 | Block 3 | Block 4 |
+|---|---|---|---|---|
+| Acoustic reception | Pass | Pass | Missing | Pass |
+| LED reception | Pass | Missing | Pass | Pass |
+| Combine blocks that pass | Accept | From sound | From LED | Accept |
+
+Combining blocks requires a message ID identifying the same transmission content, block numbers and lengths, per-block error detection, duplicate removal and whole-message verification afterward.
+The identifying metadata must also be checked; conflicting contents with the same ID and block number must not be accepted arbitrarily.
+Different rates and delays need not require precisely simultaneous signal arrivals when IDs and numbers establish correspondence.
+[RFC 8655, Section 3.2.2](https://www.rfc-editor.org/rfc/rfc8655.html#section-3.2.2) describes a network design that sends copies over multiple paths and removes duplicates using sequencing information.
+It is a design reference here, not experimental evidence for an acoustic-plus-LED air-gap link.
+
+Duplicating data over two paths adds redundancy, but two disagreeing values alone do not identify the correct one.
+The example fills erasures: missing data at known positions. Detecting and correcting wrong values requires additional information.
+CRC can detect errors but can miss some and does not authenticate the sender.
+To address a block lost on both paths, a design could send repair information alongside the original data and reconstruct from what remains.
+For example, [Reed–Solomon erasure coding in RFC 5510](https://www.rfc-editor.org/rfc/rfc5510.html) can reconstruct the source when enough distinct, valid encoding symbols arrive.
+Repeated copies of the same symbol do not count as additional distinct symbols. Recovery is limited by the code and its redundancy.
+
+Practicality depends on whether the improvement justifies the cost of maintaining both paths.
+An LED path needs a controllable light source and a receiver, with additional placement constraints, processing and power use.
+Waiting for missing parts over a slower path also adds latency. A shared host stopping or a sender software fault can affect both paths, so failures need not be independent.
+Reliability and secrecy are separate: emitting the same information through sound and light can create more opportunities for third-party observation.
+Calling a path a covert channel does not make its data encrypted.
+
+This is a future design option for recovering complementary losses and combining diversity with error-correcting codes.
+**Airborne Tone Link currently implements no LED transmission/reception, cross-path combination or error correction.**
+
 ## 🔄 Comparison with other air-gap channels
 
 Distances below are laboratory reports involving particular equipment, line of sight or favorable conditions.
