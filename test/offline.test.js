@@ -94,7 +94,7 @@ test('Offline: malformed, oversized, non-PCM and non-finite WAVs are rejected', 
 
 for (const rate of [44100, 48000]) {
   for (const mode of ['reliable', 'ultrasonic']) {
-    for (const timing of ['short', 'long']) for (const repeats of [1, 2]) {
+    for (const timing of ['short', 'long', 'longer']) for (const repeats of [1, 2]) {
     test(`Offline: ${mode} ${rate} Hz ${timing} x${repeats} PCM restores HELLO and CRC`, () => {
       const cfg = c.config(mode, rate, { timing, repeats }), wave = c.transmission('HELLO', cfg, -30);
       const { samples } = c.decodeWav(wav(wave.samples, rate));

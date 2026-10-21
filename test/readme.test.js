@@ -55,14 +55,15 @@ test('README: both speed tables recalculate from the protocol, including framing
     assert.equal(html.split(`data-metric="${metric}"`).length - 1, 2, metric);
   }
 });
-test('README: the four common timing/count settings have explicit reference rates in both languages', () => {
+test('README: the six common timing/count settings have explicit reference rates in both languages', () => {
   const expected = [
     ['11.76B/s', '2.540s', '6.30B/s'], ['5.88B/s', '4.830s', '3.31B/s'],
-    ['5.21B/s', '5.108s', '3.13B/s'], ['2.60B/s', '9.966s', '1.61B/s']
+    ['5.21B/s', '5.108s', '3.13B/s'], ['2.60B/s', '9.966s', '1.61B/s'],
+    ['2.60B/s', '9.716s', '1.65B/s'], ['1.30B/s', '19.182s', '0.83B/s']
   ];
   for (const text of documents) {
     for (const row of expected) assert.ok(text.includes('| ' + row.join(' | ') + ' |'));
-    assert.ok(text.includes('2.960'));
+    assert.ok(text.includes('5.742'));
   }
 });
 test('README: byte, tone, duration and CRC examples have known values', () => {

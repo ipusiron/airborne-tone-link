@@ -91,7 +91,11 @@ legend, label { font-weight: 600; }
 .field { display: grid; gap: 8px; margin-block: 16px; }
 .field p { margin: 0; }
 .field-label { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.field-label .icon-button { flex: 0 0 44px; }
+.field-label .icon-button { flex: 0 0 44px; display: grid; place-items: center; border: 0; background: transparent; }
+.field-label .icon-button span {
+  display: grid; place-items: center; width: 24px; height: 24px;
+  border: 1px solid var(--border); border-radius: 50%; font-size: 0.875rem; line-height: 1;
+}
 textarea, select, input[type="file"], input[type="range"] { width: 100%; max-width: 100%; }
 textarea { resize: vertical; }
 select { margin-block: 8px; }
