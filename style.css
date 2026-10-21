@@ -90,6 +90,8 @@ legend, label { font-weight: 600; }
 .choice input { width: 18px; height: 18px; margin: 0; flex: 0 0 18px; accent-color: var(--accent); }
 .field { display: grid; gap: 8px; margin-block: 16px; }
 .field p { margin: 0; }
+.field-label { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.field-label .icon-button { flex: 0 0 44px; }
 textarea, select, input[type="file"], input[type="range"] { width: 100%; max-width: 100%; }
 textarea { resize: vertical; }
 select { margin-block: 8px; }
@@ -119,6 +121,9 @@ footer a, .tool-link { display: inline-flex; align-items: center; min-height: 44
 dialog { width: min(640px, calc(100% - 32px)); max-height: 85dvh; overflow: auto; color: var(--fg); background: var(--surface); }
 dialog { border: 2px solid var(--border); border-radius: 8px; padding: 20px; }
 dialog::backdrop { background: #00000099; }
+.setting-help-dialog { max-width: 480px; }
+.setting-help-list { padding-inline-start: 1.25em; }
+.setting-help-list li + li { margin-top: 8px; }
 @media (min-width: 600px) {
   .card { padding: 24px; }
   .environment, .result-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

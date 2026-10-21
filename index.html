@@ -42,11 +42,17 @@
       <p class="muted" data-i18n="modeNote"></p>
       <div class="settings-grid">
         <div class="field">
-          <label for="timing" data-i18n="timing"></label>
+          <div class="field-label">
+            <label for="timing" data-i18n="timing"></label>
+            <button id="timing-help" class="icon-button" type="button" data-label="timingHelp" aria-haspopup="dialog" aria-controls="timing-dialog"><span aria-hidden="true">?</span></button>
+          </div>
           <select id="timing"><option value="short" data-i18n="shortTone" selected></option><option value="long" data-i18n="longTone"></option></select>
         </div>
         <div class="field">
-          <label for="repeat-count" data-i18n="repeatCount"></label>
+          <div class="field-label">
+            <label for="repeat-count" data-i18n="repeatCount"></label>
+            <button id="repeat-help" class="icon-button" type="button" data-label="repeatHelp" aria-haspopup="dialog" aria-controls="repeat-dialog"><span aria-hidden="true">?</span></button>
+          </div>
           <select id="repeat-count"><option value="1" data-i18n="once"></option><option value="2" data-i18n="twice" selected></option></select>
         </div>
       </div>
@@ -230,6 +236,26 @@
     <p data-i18n="helpOffline"></p>
     <p data-i18n="helpStop"></p>
     <button id="help-close" type="button" data-i18n="close"></button>
+  </dialog>
+  <dialog id="timing-dialog" class="setting-help-dialog" aria-labelledby="timing-help-title" aria-describedby="timing-help-intro">
+    <h2 id="timing-help-title" data-i18n="timing"></h2>
+    <p id="timing-help-intro" data-i18n="timingHelpIntro"></p>
+    <ul class="setting-help-list">
+      <li data-i18n="timingHelpShort"></li>
+      <li data-i18n="timingHelpLong"></li>
+    </ul>
+    <p id="timing-help-current" class="mono"></p>
+    <button id="timing-help-close" type="button" data-i18n="close" autofocus></button>
+  </dialog>
+  <dialog id="repeat-dialog" class="setting-help-dialog" aria-labelledby="repeat-help-title" aria-describedby="repeat-help-intro">
+    <h2 id="repeat-help-title" data-i18n="repeatCount"></h2>
+    <p id="repeat-help-intro" data-i18n="repeatHelpIntro"></p>
+    <ul class="setting-help-list">
+      <li data-i18n="repeatHelpOnce"></li>
+      <li data-i18n="repeatHelpTwice"></li>
+    </ul>
+    <p id="repeat-help-current" class="mono"></p>
+    <button id="repeat-help-close" type="button" data-i18n="close" autofocus></button>
   </dialog>
   <dialog id="processing-dialog" aria-labelledby="processing-title">
     <h2 id="processing-title" data-i18n="processingTitle"></h2>

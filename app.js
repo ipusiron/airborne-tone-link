@@ -143,6 +143,8 @@
     document.querySelectorAll('[data-metric]').forEach(node => { node.textContent = values[node.dataset.metric]; });
     const count = ['send', 'loopback'].includes($('role').value) ? `${t('repeatCount')}: ${cfg.repeats}` : t('countNotMeasured');
     $('comparison-settings').textContent = `${t(mode)} / ${t('timing')}: ${cfg.symbol * 1000}ms / ${count}`;
+    $('timing-help-current').textContent = `${t('currentSelection')}: ${t(cfg.timing === 'short' ? 'shortTone' : 'longTone')}`;
+    $('repeat-help-current').textContent = `${t('currentSelection')}: ${t(cfg.repeats === 1 ? 'once' : 'twice')}`;
   }
 
   function renderState() {
@@ -337,6 +339,14 @@
   $('help-toggle').addEventListener('click', () => { if (busy) stop(); $('help-dialog').showModal(); });
   $('help-close').addEventListener('click', () => { $('help-dialog').close(); });
   $('help-dialog').addEventListener('close', () => { $('help-toggle').focus(); });
+  for (const id of ['timing', 'repeat']) {
+    $(`${id}-help`).addEventListener('click', () => {
+      if (busy) stop();
+      $(`${id}-dialog`).showModal();
+    });
+    $(`${id}-help-close`).addEventListener('click', () => { $(`${id}-dialog`).close(); });
+    $(`${id}-dialog`).addEventListener('close', () => { $(`${id}-help`).focus(); });
+  }
   $('processing-continue').addEventListener('click', () => answerProcessing(true));
   $('processing-cancel').addEventListener('click', () => answerProcessing(false));
   $('processing-dialog').addEventListener('cancel', event => { event.preventDefault(); answerProcessing(false); });
