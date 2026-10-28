@@ -450,6 +450,7 @@ Automated loopback uses a test-only virtual path; it does not establish physical
 airborne-tone-link/
 ├── index.html                  # Single page and five learning topics
 ├── style.css                   # Themes, responsive layout and color tokens
+├── theme-init.js               # Theme before the first paint
 ├── codec-core.js               # Encoding, sync, CRC, pure FFT and WAV parser
 ├── audio-io.js                 # Audio input/output, stopping and WAV progress
 ├── messages.js                 # Japanese and English dictionaries
@@ -461,6 +462,7 @@ airborne-tone-link/
 │   ├── app-state.test.js       # Recovered candidates, missing data, verification and reset
 │   ├── offline.test.js         # Independent DFT, WAV and actual PCM decoding
 │   ├── structure.test.js       # CSP, contrast, dictionaries and formatting
+│   ├── theme-init.test.js      # Initial theme and load position
 │   └── readme.test.js          # Metadata, examples, rates, sources and images
 ├── .github/workflows/test.yml  # Node 22 checks on push and pull requests
 ├── package.json                # Dependency-free test command

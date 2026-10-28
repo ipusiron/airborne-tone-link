@@ -7,7 +7,8 @@
   const save = (key, value) => { try { localStorage.setItem('airborne-tone-link.' + key, value); } catch (_) { /* Optional. */ } };
   const query = new URLSearchParams(location.search).get('lang');
   let language = [query, stored('lang'), navigator.language.startsWith('ja') ? 'ja' : 'en'].find(v => v === 'ja' || v === 'en');
-  let theme = stored('theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  /* theme-init.js has already set data-theme in <head> from the saved choice or the OS setting; start-up reads it back. */
+  let theme = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
   let errorKey = '', inputError = '', statusKey = 'waiting', busy = false, generation = 0;
   let environment = null, result = null, resultRole = null, expected = null, live = null, confirmResolve = null;
   let diagnostics = null;
