@@ -8,6 +8,7 @@ Day120の音響通信教材です。通常スクリプトのUMD形式とし、�
 - `audio-io.js`：音声経路、許可、加工状態、停止、入力解放、オフライン処理の進行
 - `app.js`：DOM、スペクトログラム、ライブ復元、役割の切り替え
 - `messages.js`：日英の表示文言。データの描画はtextContent
+- `theme-init.js`：最初の描画の前に`<html>`の`data-theme`を決める。`<head>`で`style.css`の直後にdeferなしで読む。保存値（`light`／`dark`）を優先し、なければOSの設定に従う。`app.js`は起動時に`data-theme`を読み、トグルで切り替えて保存する
 - `test/`：Node.js 22のnode:test。`npm test`で実行
 
 ## 維持する規則

@@ -481,6 +481,7 @@ CIはpushとpull_requestで構文検査とテストを実行します。
 airborne-tone-link/
 ├── index.html                  # 1ページの画面・5節の座学
 ├── style.css                   # 明暗・レスポンシブ・配色トークン
+├── theme-init.js               # 描画前の明暗の決定
 ├── codec-core.js               # 符号化・同期・CRC・純粋FFT・WAV解析
 ├── audio-io.js                 # 音声入出力・停止・WAV復元の進行
 ├── messages.js                 # 日英辞書
@@ -492,6 +493,7 @@ airborne-tone-link/
 │   ├── app-state.test.js       # 復元候補・未取得・検証状態・結果消去
 │   ├── offline.test.js         # 独立DFT・WAV・実PCM復元
 │   ├── structure.test.js       # CSP・配色・辞書・形式
+│   ├── theme-init.test.js      # 最初の明暗と読み込み位置
 │   └── readme.test.js          # メタデータ・例・速度・出典・画像
 ├── .github/workflows/test.yml  # pushとPRのNode 22検証
 ├── package.json                # 依存なしのテストコマンド
