@@ -98,6 +98,7 @@ The tool has no recording or audio-download feature.
 ### Compare transmitted and received sound
 
 If text recovery fails, check Reception diagnostics. It shows data tone detection, marker types, start sequences, length bytes, readable payload, frame verification and the largest analysis interval for that run. Stages not reached are not treated as successful, and readable bytes are not combined across repeats. The failed stage remains visible after stopping. Visible tones alone do not establish successful text communication.
+Until a frame passes verification, the page suggests raising the sender's output level a little at a time, using a longer tone, and then moving the speaker and microphone closer.
 
 The default Loopback role shows the outgoing waveform above and microphone input below. Separate analyzers measure the two paths on the same time, frequency and color scales. The output is never wired directly into the receiver. The upper plot measures the digital waveform passed to the speaker, not sound emitted into the air. Their difference is not a calibrated attenuation measurement.
 
