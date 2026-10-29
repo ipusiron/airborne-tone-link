@@ -76,7 +76,7 @@
     diagnosticIncomplete: '本文を一部読み取りましたが、フレームの末尾まで確認できていません。',
     diagnosticInvalid: 'フレームの末尾まで解析しましたが、検証に合格していません。',
     diagnosticSuccess: '少なくとも1回、本文・CRC・終了マーカー・UTF-8の検証に合格しました。',
-    diagnosticHint: '届かない・欠けるときは、送信側の出力レベルを少しずつ上げる（上限−12dBFS）、音を長くする、' +
+    diagnosticHint: '届かない・欠けるときは、送信側の出力レベルを少しずつ上げる（上限−12dBFS）→音を長くする→' +
       'スピーカーとマイクを近づける、の順に試してください。',
     diagnosticTones: 'データ用2トーン', detected: '判定あり', notDetected: '未確認', diagnosticMarkers: 'マーカーの種類',
     diagnosticSyncs: '開始の合図を確認した回数', diagnosticHeader: '長さ情報', diagnosticRead: '読取 ', diagnosticFailed: '失敗 ',
