@@ -98,6 +98,7 @@ The tool has no recording or audio-download feature.
 ### Compare transmitted and received sound
 
 If text recovery fails, check Reception diagnostics. It shows data tone detection, marker types, start sequences, length bytes, readable payload, frame verification and the largest analysis interval for that run. Stages not reached are not treated as successful, and readable bytes are not combined across repeats. The failed stage remains visible after stopping. Visible tones alone do not establish successful text communication.
+Until a frame passes verification, the page suggests raising the sender's output level a little at a time, using a longer tone, and then moving the speaker and microphone closer.
 
 The default Loopback role shows the outgoing waveform above and microphone input below. Separate analyzers measure the two paths on the same time, frequency and color scales. The output is never wired directly into the receiver. The upper plot measures the digital waveform passed to the speaker, not sound emitted into the air. Their difference is not a calibrated attenuation measurement.
 
@@ -320,6 +321,20 @@ It used Chromium, −30dBFS output and two full transmissions. This was one equi
 The additional software-only checks recovered all 256 bytes exactly in 24 combinations of different sample rates, both bands, all three durations and one/two copies.
 The physical failure's cause was not identified; these results do not implicate any particular everyday noise listed above.
 Support for processing 256 bytes and reliable transfer through air are evaluated separately.
+
+On 2026-10-30, `HELLO` was sent in a physical loopback on one PC in Vivaldi, using the same two devices reported by the browser as “FOSTEX PC200USB-HR” and “HyperX SoloCast”, placed about 60cm apart.
+Each run used two full transmissions, with microphone echo cancellation, noise suppression and automatic gain all off.
+
+| Condition | Observation |
+|---|---|
+| Audible, 192ms, −30dBFS | The start sequence and length were read in both copies, but the first byte was missing (“?ELLO”). Both frames failed verification |
+| Audible, 384ms, −30dBFS | The first character remained “?” |
+| Audible, 192ms, −21dBFS | Both frames passed verification and `HELLO` was recovered |
+| Near-ultrasonic, 384ms, −21dBFS | One of two frames passed verification and `HELLO` was recovered |
+
+In this placement, longer tones did not recover the message, while raising the output level from −30dBFS to −21dBFS did.
+Each condition was tried once; these are not two-device or different-room results.
+The 256-byte trials on 2026-10-21 also used −30dBFS, but 256 bytes have not been sent at −21dBFS.
 
 ### Information can survive a failed whole-message check
 

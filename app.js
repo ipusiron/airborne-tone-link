@@ -259,12 +259,14 @@
     if (!d || !d.windows) {
       $('diagnostic-summary').textContent = t('diagnosticWaiting');
       $('diagnostic-details').textContent = '';
+      $('diagnostic-hint').hidden = true;
       return;
     }
     const state = d.validFrames ? 'diagnosticSuccess' : d.frames ? 'diagnosticInvalid' :
       d.headers ? (d.maxReadable ? 'diagnosticIncomplete' : 'diagnosticNoBody') : d.syncs ? 'diagnosticNoHeader' :
         d.dataWindows || d.markerMask ? 'diagnosticNoSync' : 'diagnosticNoTone';
     $('diagnostic-summary').textContent = t(state);
+    $('diagnostic-hint').hidden = state === 'diagnosticSuccess';
     const markers = (d.markerMask & 1 ? 1 : 0) + (d.markerMask & 2 ? 1 : 0);
     const lines = [
       `${t('diagnosticTones')}: ${t(d.dataWindows ? 'detected' : 'notDetected')}`,

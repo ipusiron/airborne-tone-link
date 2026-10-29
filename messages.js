@@ -76,6 +76,8 @@
     diagnosticIncomplete: '本文を一部読み取りましたが、フレームの末尾まで確認できていません。',
     diagnosticInvalid: 'フレームの末尾まで解析しましたが、検証に合格していません。',
     diagnosticSuccess: '少なくとも1回、本文・CRC・終了マーカー・UTF-8の検証に合格しました。',
+    diagnosticHint: '届かない・欠けるときは、送信側の出力レベルを少しずつ上げる（上限−12dBFS）→音を長くする→' +
+      'スピーカーとマイクを近づける、の順に試してください。',
     diagnosticTones: 'データ用2トーン', detected: '判定あり', notDetected: '未確認', diagnosticMarkers: 'マーカーの種類',
     diagnosticSyncs: '開始の合図を確認した回数', diagnosticHeader: '長さ情報', diagnosticRead: '読取 ', diagnosticFailed: '失敗 ',
     diagnosticPayload: '1フレーム内で最多の読取本文', diagnosticFrames: 'フレーム検証', diagnosticPassed: '成功 ', notReached: '未到達',
@@ -223,6 +225,8 @@
     diagnosticIncomplete: 'Some payload bytes were read, but the end of a frame has not been confirmed.',
     diagnosticInvalid: 'A frame was analyzed through its end, but verification failed.',
     diagnosticSuccess: 'At least one frame passed payload, CRC, end-marker and UTF-8 verification.',
+    diagnosticHint: 'If nothing arrives or bytes are missing, try these in order: raise the sender\'s output level a little ' +
+      'at a time (up to −12dBFS), use a longer tone, then move the speaker and microphone closer.',
     diagnosticTones: 'Data tone pairs', detected: 'Detected', notDetected: 'Not confirmed', diagnosticMarkers: 'Marker types',
     diagnosticSyncs: 'Confirmed start sequences', diagnosticHeader: 'Length byte', diagnosticRead: 'Read ', diagnosticFailed: 'Failed ',
     diagnosticPayload: 'Most readable payload in one frame', diagnosticFrames: 'Frame verification', diagnosticPassed: 'Passed ',

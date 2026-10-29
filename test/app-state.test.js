@@ -107,12 +107,24 @@ for (const [values, key] of [
     });
     await view.start();
     assert.equal(view.nodes['diagnostic-summary'].textContent, messages.en[key]);
+    assert.equal(view.nodes['diagnostic-hint'].hidden, false);
     assert.equal(view.nodes['live-text'].textContent, messages.en.noRecoveredText);
     view.changeMode();
     assert.equal(view.nodes['diagnostic-summary'].textContent, messages.en.diagnosticWaiting);
     assert.equal(view.nodes['diagnostic-details'].textContent, '');
+    assert.equal(view.nodes['diagnostic-hint'].hidden, true);
   });
 }
+
+test('UI diagnostics: the level hint stays hidden once a frame passes verification', async () => {
+  const view = app(async (_r, _t, _m, _d, emit) => {
+    emit({ type: 'diagnostics', value: diagnostic({ frames: 2, validFrames: 1, crcFailures: 1 }) });
+    return frame([65], 'A', true);
+  });
+  await view.start();
+  assert.equal(view.nodes['diagnostic-summary'].textContent, messages.en.diagnosticSuccess);
+  assert.equal(view.nodes['diagnostic-hint'].hidden, true);
+});
 
 test('UI diagnostics: sender observations are hidden and cannot be presented as receiver success', async () => {
   const view = app(async (_r, _t, _m, _d, emit) => {
