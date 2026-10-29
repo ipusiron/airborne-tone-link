@@ -64,8 +64,7 @@ h2 { margin: 0 0 16px; font-size: 1.2rem; }
 h3 { font-size: 1rem; }
 p { margin: 12px 0; }
 .header-tools { display: flex; gap: 8px; margin-left: auto; }
-.eyebrow, .number, .mono { font-family: var(--mono); }
-.eyebrow { color: var(--muted); font-size: 0.75rem; letter-spacing: 0.12em; }
+.number, .mono { font-family: var(--mono); }
 .number { color: var(--accent); margin-right: 10px; font-size: 0.9rem; }
 main { display: grid; gap: 20px; }
 .card { min-width: 0; padding: 16px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
