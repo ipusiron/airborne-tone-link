@@ -137,7 +137,7 @@
     processing: '音声の加工', processingEffect: 'エコー除去やノイズ抑制がトーンを弱める場合があります。',
     room: '暗騒音・反響・距離', roomEffect: '2本の候補が弱まったり、前のシンボルと重なったりします。',
     lesson3Text: 'ネットワークから隔離した端末間でも、スピーカーとマイクが通信路になります。この教材は通信内容を暗号化していません。',
-    question: '観点', boundary: 'この教材で分かること', transport: '通信の成立', transportAnswer: '音を拾い、CRCまで確認できたか。',
+    question: '観点', boundary: 'この教材でわかること', transport: '通信の成立', transportAnswer: '音を拾い、CRCまで確認できたか。',
     secrecy: '内容の秘密', secrecyAnswer: '同じ方式を知る第三者も復元できます。暗号化は別の設計です。',
     observation: '帯域の観測', observationAnswer: '強い音があっても、送信者や目的までは特定できません。',
     lesson4Text: '『エアギャップ・ブリッジ』が扱う入力・出力の方向を、音響通信で考える関連教材です。書籍の本文は転載していません。',
