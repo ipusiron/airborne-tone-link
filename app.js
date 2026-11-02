@@ -15,6 +15,12 @@
   let deviceInfo = { microphone: null, speaker: null }, deviceStatus = 'deviceWaiting', deviceTest = null, microphoneLevel = null;
   const audio = window.AirborneAudio.create();
   const t = key => messages[language][key] || key;
+  /* Rewriting identical text still replaces the text node, so live regions are written only on change. */
+  const setLive = (node, text) => {
+    if (node.textContent === text) return false;
+    node.textContent = text;
+    return true;
+  };
   const plots = Object.fromEntries([['transmit', 'transmit-spectrogram', 'transmit-tone-pair'],
     ['receive', 'spectrogram', 'tone-pair']].map(([side, id, pair]) => {
     const canvas = $(id);
@@ -126,14 +132,14 @@
     try {
       const bytes = core.bytesOf($('text-input').value);
       $('byte-count').textContent = `${bytes.length} / ${core.MAX_BYTES} ${t('unitsBytes')}`;
-      $('byte-preview').textContent = bytes.map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(' ');
+      setLive($('byte-preview'), bytes.map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(' '));
       inputError = '';
     } catch (error) {
       $('byte-count').textContent = `${new TextEncoder().encode($('text-input').value).length} / ${core.MAX_BYTES} ${t('unitsBytes')}`;
-      $('byte-preview').textContent = '';
+      setLive($('byte-preview'), '');
       inputError = error.message;
     }
-    $('error').textContent = t(($('send-fields').hidden ? '' : inputError) || errorKey);
+    renderError();
     renderSettings();
   }
 
@@ -158,18 +164,18 @@
 
   function renderState() {
     renderDevices();
-    $('status').textContent = t(statusKey);
-    $('error').textContent = t(($('send-fields').hidden ? '' : inputError) || errorKey);
+    setLive($('status'), t(statusKey));
+    renderError();
     const role = resultRole || $('role').value;
     renderDiagnostics(role);
     $('transmit-source').textContent = t(['send', 'loopback'].includes(role) ? 'transmitSource' : 'noTransmitSource');
     $('receive-source').textContent = t(role === 'send' ? 'noReceiveSource' : role === 'offline' ? 'sourceWav' : 'receiveSource');
     $('live-source').textContent = t(role === 'send' ? 'sourceSend' : role === 'offline' ? 'sourceWav' : 'sourceMic');
     const known = live ? live.bytes.filter(byte => byte !== null).length : 0;
-    $('live-text').textContent = known ? live.text || t('incompleteCharacter') : t('noRecoveredText');
+    setLive($('live-text'), known ? live.text || t('incompleteCharacter') : t('noRecoveredText'));
     const state = live && live.type === 'frame' ? (live.valid ? 'liveVerified' : 'liveInvalid') :
       live ? (busy ? 'livePending' : 'liveUnverified') : 'liveEmpty';
-    $('live-state').textContent = t(state);
+    setLive($('live-state'), t(state));
     $('live-count').textContent = live ?
       `${t('readBytes')}: ${known} / ${t('unknownBytes')}: ${live.bytes.length - known}` : '';
     if (environment) {
@@ -198,16 +204,25 @@
     }
   }
 
+  function renderError() {
+    setLive($('error'), t(($('send-fields').hidden ? '' : inputError) || errorKey));
+  }
+
+  /* One spoken summary when a run ends (completion, error or stop), instead of streaming partial bytes. */
+  function announceRun() {
+    setLive($('live-announcement'), `${$('live-text').textContent} ${$('live-state').textContent}`);
+  }
+
   function renderDevices() {
     $('device-microphone').textContent = deviceInfo.microphone || t('deviceUnconfirmed');
     $('device-speaker').textContent = `${t('systemOutput')}` +
       (deviceInfo.speaker ? `: ${deviceInfo.speaker}` : ` (${t('deviceUnconfirmed')})`);
-    $('device-status').textContent = t(deviceStatus) + (deviceStatus === 'deviceTestFailed' && errorKey ? ` ${t(errorKey)}` : '');
+    setLive($('device-status'), t(deviceStatus) + (deviceStatus === 'deviceTestFailed' && errorKey ? ` ${t(errorKey)}` : ''));
     $('microphone-level').hidden = !microphoneLevel;
     if (microphoneLevel) {
       $('microphone-meter').value = microphoneLevel.db;
-      $('microphone-level-value').textContent = `${microphoneLevel.db.toFixed(1)}dBFS / ` +
-        `${t('maximum')}: ${microphoneLevel.maximum.toFixed(1)}dBFS`;
+      setLive($('microphone-level-value'), `${microphoneLevel.db.toFixed(1)}dBFS / ` +
+        `${t('maximum')}: ${microphoneLevel.maximum.toFixed(1)}dBFS`);
     }
   }
 
@@ -257,7 +272,7 @@
     $('receive-diagnostics').hidden = role === 'send';
     const d = diagnostics;
     if (!d || !d.windows) {
-      $('diagnostic-summary').textContent = t('diagnosticWaiting');
+      setLive($('diagnostic-summary'), t('diagnosticWaiting'));
       $('diagnostic-details').textContent = '';
       $('diagnostic-hint').hidden = true;
       return;
@@ -265,7 +280,7 @@
     const state = d.validFrames ? 'diagnosticSuccess' : d.frames ? 'diagnosticInvalid' :
       d.headers ? (d.maxReadable ? 'diagnosticIncomplete' : 'diagnosticNoBody') : d.syncs ? 'diagnosticNoHeader' :
         d.dataWindows || d.markerMask ? 'diagnosticNoSync' : 'diagnosticNoTone';
-    $('diagnostic-summary').textContent = t(state);
+    setLive($('diagnostic-summary'), t(state));
     $('diagnostic-hint').hidden = state === 'diagnosticSuccess';
     const markers = (d.markerMask & 1 ? 1 : 0) + (d.markerMask & 2 ? 1 : 0);
     const lines = [
@@ -292,6 +307,7 @@
     });
     preview();
     renderState();
+    setLive($('live-announcement'), '');
     drawPlot();
   }
 
@@ -309,6 +325,7 @@
   }
 
   function stop() {
+    const running = busy && !deviceTest;
     generation++;
     if (confirmResolve) confirmResolve(false);
     confirmResolve = null;
@@ -319,6 +336,7 @@
     setBusy(false);
     statusKey = 'stopped';
     renderState();
+    if (running) announceRun();
     drawPlot();
   }
 
@@ -371,6 +389,7 @@
     plotReset(mode);
     setBusy(true);
     renderState();
+    setLive($('live-announcement'), '');
     try {
       const onEvent = event => { if (token === generation) handleEvent(event); };
       let received;
@@ -405,6 +424,7 @@
         $('wav-input').value = '';
         setBusy(false);
         renderState();
+        announceRun();
         drawPlot();
       }
     }
@@ -417,6 +437,7 @@
     plotReset(document.querySelector('input[name="mode"]:checked').value);
     renderSettings();
     renderState();
+    setLive($('live-announcement'), '');
   }
 
   function roleChanged() {
@@ -433,7 +454,12 @@
   }));
   for (const id of ['timing', 'repeat-count']) $(id).addEventListener('change', () => { if (!busy) clearResults(); });
   $('wav-input').addEventListener('change', () => { errorKey = ''; renderState(); });
-  $('gain').addEventListener('input', () => { $('gain-value').textContent = `${$('gain').value}dBFS`; renderSettings(); });
+  $('gain').addEventListener('input', () => {
+    // The slider itself speaks its value; the visible readout is not a live region.
+    $('gain').ariaValueText = `${$('gain').value}dBFS`;
+    setLive($('gain-value'), `${$('gain').value}dBFS`);
+    renderSettings();
+  });
   $('lang-toggle').addEventListener('click', () => { language = language === 'ja' ? 'en' : 'ja'; save('lang', language); render(); });
   $('theme-toggle').addEventListener('click', () => { theme = theme === 'light' ? 'dark' : 'light'; save('theme', theme); render(); });
   $('start').addEventListener('click', start);
