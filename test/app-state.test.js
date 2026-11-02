@@ -239,3 +239,43 @@ test('UI: changing band preserves common timing and count and forwards them to a
   view.changeRole('send');
   assert.equal(view.nodes['receive-source'].textContent, messages.en.noReceiveSource);
 });
+
+const liveRegionIds = () => [...fs.readFileSync(path.join(root, 'index.html'), 'utf8').matchAll(/<(\w+)\b([^>]*\bid="([^"]+)"[^>]*)>/g)]
+  .filter(([, tag, attrs]) => /role="(?:status|alert)"|aria-live="(?:polite|assertive)"/.test(attrs) ||
+    (tag === 'output' && !/aria-live="off"/.test(attrs)))
+  .map(match => match[3]).sort();
+
+test('A11y: only status, errors, device state and the end-of-run summary are live regions', () => {
+  assert.deepEqual(liveRegionIds(), ['device-status', 'error', 'live-announcement', 'status']);
+  const source = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
+  for (const id of [...liveRegionIds(), 'live-text', 'live-state', 'diagnostic-summary', 'microphone-level-value', 'byte-preview', 'gain-value']) {
+    assert.doesNotMatch(source, new RegExp(`\\$\\('${id}'\\)\\.textContent\\s*=`), id);
+  }
+});
+
+test('A11y: repeated receive progress never rewrites live regions and the result is announced once per run', async () => {
+  const writes = {};
+  const view = app(async (_role, _text, _mode, _db, emit) => {
+    for (let i = 0; i < 40; i++) emit({ type: 'diagnostics', value: diagnostic({}) });
+    emit(byte([0x48], 'H'));
+    emit(byte([0x48, 0x49], 'HI'));
+    for (let i = 0; i < 40; i++) emit({ type: 'diagnostics', value: diagnostic({ syncs: 1, headers: 1, readableLength: 2, maxReadable: 2 }) });
+    return frame([0x48, 0x49], 'HI', true);
+  });
+  for (const id of liveRegionIds()) {
+    const node = view.nodes[id];
+    let text = node.textContent;
+    writes[id] = 0;
+    Object.defineProperty(node, 'textContent', { get: () => text, set: value => { writes[id]++; text = value; } });
+  }
+  await view.start();
+  assert.deepEqual(writes, { 'device-status': 0, error: 0, 'live-announcement': 1, status: 2 });
+  assert.equal(view.nodes['live-announcement'].textContent, `HI ${messages.en.liveVerified}`);
+  assert.equal(view.nodes['live-text'].textContent, 'HI');
+  await view.start();
+  // Cleared at start and rewritten at the end, so an identical second result is still announced.
+  assert.equal(writes['live-announcement'], 3);
+  assert.equal(view.nodes['live-announcement'].textContent, `HI ${messages.en.liveVerified}`);
+  view.changeRole('receive');
+  assert.equal(view.nodes['live-announcement'].textContent, '');
+});
